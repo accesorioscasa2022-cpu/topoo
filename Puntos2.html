@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GeoCAD Pro - Topo & GPS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { padding-bottom: env(safe-area-inset-bottom); }
+        input[type="number"] { font-size: 18px; } /* Tamaño grande nativo */
+        .map-bg {
+            aspect-ratio: 1 / 1;
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        button { touch-action: manipulation; }
+        .toast {
+            transition: opacity 0.3s, transform 0.3s;
+            transform: translateY(100px);
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col font-sans mb-12 text-base">
+
+    <header class="bg-slate-900 text-white pt-5 shadow-lg sticky top-0 z-50">
+        <div class="px-4 flex justify-between items-center pb-4">
+            <div>
+                <h1 class="text-xl font-bold text-emerald-400">GeoCAD Pro</h1>
+                <p class="text-xs text-slate-300 font-medium tracking-widest flex items-center gap-1 mt-1">
+                    AUTOGUARDADO ON <span class="bg-emerald-500 w-2 h-2 rounded-full animate-pulse"></span>
+                </p>
+            </div>
+            <div id="descargas-gps" class="flex gap-2">
+                <button onclick="descargarGPS('kml')" class="px-3 py-2 bg-sky-500 rounded-lg text-xs font-bold shadow-md hover:bg-sky-400">.KML</button>
+                <button onclick="descargarGPS('scr')" class="px-3 py-2 bg-blue-600 rounded-lg text-xs font-bold shadow-md">.SCR</button>
+            </div>
+            <div id="descargas-manual" class="hidden flex gap-2">
+                <button onclick="descargarManual()" id="btn-descarga-manual" class="px-3 py-2 bg-emerald-600 rounded-lg text-xs font-bold shadow-md opacity-50 cursor-not-allowed" disabled>
+                    CAD .SCR
+                </button>
+            </div>
+        </div>
+        
+        <div class="flex bg-slate-800 text-sm font-bold">
+            <button onclick="cambiarPestana('gps')" id="tab-gps" class="flex-1 py-4 border-b-4 border-blue-500 text-blue-400 transition-colors">
+                📍 GPS (Caminar)
+            </button>
+            <button onclick="cambiarPestana('manual')" id="tab-manual" class="flex-1 py-4 border-b-4 border-transparent text-slate-400 transition-colors">
+                📐 CINTA (Medir)
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 relative">
+
+        <div id="vista-gps" class="p-4 space-y-5 pb-32">
+            
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-3">
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">SEÑAL GPS</span>
+                    <span id="gps-precision" class="text-xs px-3 py-1 rounded-full bg-slate-100 font-bold text-slate-500">Buscando...</span>
+                </div>
+                <div id="gps-coords-display" class="grid grid-cols-3 gap-2 text-sm text-slate-700">
+                    <div class="bg-slate-50 p-3 rounded-lg text-center border border-slate-200 font-mono font-bold">LAT<br>---</div>
+                    <div class="bg-slate-50 p-3 rounded-lg text-center border border-slate-200 font-mono font-bold">LON<br>---</div>
+                    <div class="bg-slate-50 p-3 rounded-lg text-center border border-slate-200 font-mono font-bold">ALT<br>---</div>
+                </div>
+                <div id="gps-error-panel" class="hidden mt-3 p-3 bg-red-50 rounded-xl border border-red-200 text-sm text-red-700 font-bold"></div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-blue-600 text-white p-5 rounded-2xl shadow-md flex flex-col justify-center">
+                    <span class="text-xs uppercase opacity-80 font-bold tracking-wider">Área Estimada</span>
+                    <div id="area-gps" class="text-3xl font-black mt-1">0 m²</div>
+                </div>
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
+                    <div class="flex justify-between items-start">
+                        <span class="text-xs uppercase text-slate-500 font-bold tracking-wider">Vértices</span>
+                        <button onclick="limpiarGPS()" class="text-red-500 bg-red-50 p-2 rounded-lg font-bold text-xs uppercase">Borrar</button>
+                    </div>
+                    <div id="contador-gps" class="text-3xl font-black text-slate-800">0</div>
+                </div>
+            </div>
+
+            <div class="bg-slate-900 rounded-2xl shadow-xl overflow-hidden border border-slate-700 relative">
+                <div class="absolute top-3 left-3 z-10 bg-white/20 backdrop-blur px-3 py-1 rounded text-xs font-bold text-white">Croquis GPS</div>
+                <div class="map-bg w-full flex items-center justify-center p-3">
+                    <svg id="svg-gps" width="100%" height="100%" viewBox="0 0 100 100" class="overflow-visible">
+                        <text id="gps-placeholder" x="50" y="50" fill="#94a3b8" text-anchor="middle" font-size="6">Captura puntos para dibujar</text>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="max-h-[200px] overflow-y-auto">
+                    <table class="w-full text-sm text-left">
+                        <tbody id="lista-gps" class="divide-y divide-slate-100">
+                            <tr><td class="p-5 text-center text-slate-400 italic">Los puntos aparecerán aquí</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="fixed bottom-10 left-1/2 -translate-x-1/2 z-40">
+                <button onclick="capturarPuntoGPS()" class="bg-blue-600 text-white w-24 h-24 rounded-full shadow-[0_10px_30px_rgba(37,99,235,0.5)] flex items-center justify-center border-4 border-white active:scale-95 transition-transform">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div id="vista-manual" class="hidden p-4 space-y-5">
+            
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                    <h2 class="text-sm font-bold text-slate-600 uppercase tracking-widest">Medidas (Metros)</h2>
+                    <button onclick="limpiarManual()" class="text-xs text-red-600 font-bold bg-red-50 px-3 py-2 rounded-lg">LIMPIAR TODO</button>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-slate-500">Base (L1)</label>
+                        <input type="number" id="l1" step="0.01" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-3 text-lg font-mono focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Ej. 10.00" oninput="calcularManual()">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-slate-500">Derecha (L2)</label>
+                        <input type="number" id="l2" step="0.01" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-3 text-lg font-mono focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Ej. 20.00" oninput="calcularManual()">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-slate-500">Arriba (L3)</label>
+                        <input type="number" id="l3" step="0.01" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-3 text-lg font-mono focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Ej. 10.00" oninput="calcularManual()">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-slate-500">Izquierda (L4)</label>
+                        <input type="number" id="l4" step="0.01" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-3 text-lg font-mono focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Ej. 20.00" oninput="calcularManual()">
+                    </div>
+                </div>
+                <div class="mt-4 space-y-1">
+                    <label class="text-xs font-bold text-red-600 uppercase">Diagonal (D1)</label>
+                    <input type="number" id="d1" step="0.01" class="w-full bg-red-50 border border-red-300 rounded-lg p-3 text-lg font-mono text-red-700 focus:ring-2 focus:ring-red-500 outline-none" placeholder="Cruce (Ej. 22.36)" oninput="calcularManual()">
+                </div>
+                <div id="error-manual" class="hidden mt-3 text-sm text-red-700 font-bold bg-red-100 p-3 rounded-lg border border-red-200"></div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-emerald-600 text-white p-5 rounded-2xl shadow-md flex flex-col justify-center">
+                    <span class="text-xs uppercase opacity-80 font-bold tracking-wider">Área Exacta</span>
+                    <div id="area-manual" class="text-3xl font-black mt-1">0 m²</div>
+                </div>
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-center">
+                    <span class="text-xs uppercase text-slate-500 font-bold tracking-wider">Perímetro</span>
+                    <div id="perim-manual" class="text-2xl font-black text-slate-800 mt-1">0 m</div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-300 relative">
+                <div class="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur px-3 py-1 rounded text-xs font-bold text-slate-600 shadow-sm">
+                    Forma Real Calculada
+                </div>
+                <div class="map-bg w-full flex items-center justify-center p-4">
+                    <svg id="svg-manual" width="100%" height="100%" viewBox="0 0 100 100" class="overflow-visible">
+                        <text id="manual-placeholder" x="50" y="50" fill="#94a3b8" text-anchor="middle" font-size="6" font-weight="bold">Faltan medidas...</text>
+                    </svg>
+                </div>
+            </div>
+            
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-xs font-bold text-slate-600 uppercase">Punto Global</span>
+                    <button onclick="capturarRefManual()" id="btn-gps-manual" class="text-xs bg-slate-800 text-white px-4 py-2 rounded-lg font-bold active:bg-slate-700">ANCLAR GPS</button>
+                </div>
+                <div id="gps-data-manual" class="text-xs text-slate-500 font-mono mt-2">
+                    Sin coordenada. AutoCAD lo dibujará en X:0, Y:0.
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <div id="toast" class="fixed bottom-1/2 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-5 py-3 rounded-full text-sm font-bold opacity-0 pointer-events-none z-50 toast shadow-2xl whitespace-nowrap">
+        Notificación
+    </div>
+
+    <script>
+        function cambiarPestana(vista) {
+            const vGps = document.getElementById('vista-gps'), vMan = document.getElementById('vista-manual');
+            const tGps = document.getElementById('tab-gps'), tMan = document.getElementById('tab-manual');
+            const dGps = document.getElementById('descargas-gps'), dMan = document.getElementById('descargas-manual');
+
+            if (vista === 'gps') {
+                vGps.classList.remove('hidden'); vMan.classList.add('hidden');
+                dGps.classList.remove('hidden'); dMan.classList.add('hidden');
+                tGps.className = "flex-1 py-4 border-b-4 border-blue-500 text-blue-400 transition-colors";
+                tMan.className = "flex-1 py-4 border-b-4 border-transparent text-slate-400 transition-colors";
+            } else {
+                vGps.classList.add('hidden'); vMan.classList.remove('hidden');
+                dGps.classList.add('hidden'); dMan.classList.remove('hidden');
+                tMan.className = "flex-1 py-4 border-b-4 border-emerald-500 text-emerald-400 transition-colors";
+                tGps.className = "flex-1 py-4 border-b-4 border-transparent text-slate-400 transition-colors";
+            }
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2000);
+        }
+
+        const R = 6371000; 
+
+        // === GPS ===
+        let puntosGPS = [];
+        let actualGPS = null;
+
+        function guardarEstadoGPS() { localStorage.setItem('geoCad_puntosGPS', JSON.stringify(puntosGPS)); }
+
+        function limpiarGPS() {
+            if(confirm("¿Borrar TODOS los puntos GPS?")) {
+                puntosGPS = []; guardarEstadoGPS(); renderTablaGPS(); dibujarMapaGPS(); calcularAreaGPS();
+            }
+        }
+
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(
+                pos => {
+                    actualGPS = { lat: pos.coords.latitude, lng: pos.coords.longitude, alt: pos.coords.altitude || 0, acc: pos.coords.accuracy };
+                    document.getElementById('gps-error-panel').classList.add('hidden');
+                    document.getElementById('gps-coords-display').innerHTML = `
+                        <div class="bg-slate-50 p-3 rounded-lg text-center border border-slate-200 font-mono font-bold">LAT<br>${actualGPS.lat.toFixed(5)}</div>
+                        <div class="bg-slate-50 p-3 rounded-lg text-center border border-slate-200 font-mono font-bold">LON<br>${actualGPS.lng.toFixed(5)}</div>
+                        <div class="bg-slate-50 p-3 rounded-lg text-center border border-slate-200 font-mono font-bold">ALT<br>${actualGPS.alt.toFixed(0)}m</div>
+                    `;
+                    const badge = document.getElementById('gps-precision');
+                    badge.innerText = `Precisión ±${actualGPS.acc.toFixed(1)}m`;
+                    badge.className = `text-xs px-3 py-1 rounded-full font-bold text-white ${actualGPS.acc < 8 ? 'bg-green-600' : 'bg-orange-500'}`;
+                },
+                err => {
+                    const ep = document.getElementById('gps-error-panel'); ep.classList.remove('hidden');
+                    ep.innerText = err.code === 1 ? "⚠️ Permiso GPS denegado. Actívalo en el candado." : "Buscando satélites...";
+                },
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+            );
+        }
+
+        function capturarPuntoGPS() {
+            if (!actualGPS) return showToast("Esperando señal...");
+            puntosGPS.push({...actualGPS, id: puntosGPS.length + 1});
+            guardarEstadoGPS(); showToast(`Punto #${puntosGPS.length} OK`);
+            renderTablaGPS(); dibujarMapaGPS(); calcularAreaGPS();
+        }
+
+        function eliminarPuntoGPS(id) {
+            puntosGPS = puntosGPS.filter(p => p.id !== id);
+            guardarEstadoGPS(); renderTablaGPS(); dibujarMapaGPS(); calcularAreaGPS();
+        }
+
+        function renderTablaGPS() {
+            document.getElementById('contador-gps').innerText = puntosGPS.length;
+            const html = puntosGPS.slice().reverse().map(p => `
+                <tr class="bg-white border-b border-slate-100">
+                    <td class="p-4 font-black text-blue-600">#${p.id}</td>
+                    <td class="p-4 font-mono text-slate-600 text-sm">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</td>
+                    <td class="p-4 text-right">
+                        <button onclick="eliminarPuntoGPS(${p.id})" class="text-red-500 font-bold bg-red-50 px-3 py-2 rounded-lg text-xs">X</button>
+                    </td>
+                </tr>
+            `).join('');
+            document.getElementById('lista-gps').innerHTML = html || '<tr><td class="p-5 text-center text-slate-400 italic">Captura el perímetro</td></tr>';
+        }
+
+        function calcularAreaGPS() {
+            if (puntosGPS.length < 3) return document.getElementById('area-gps').innerText = "0 m²";
+            const origin = puntosGPS[0];
+            const coords = puntosGPS.map(p => ({
+                x: (p.lng - origin.lng) * (Math.PI / 180) * R * Math.cos(origin.lat * Math.PI / 180),
+                y: (p.lat - origin.lat) * (Math.PI / 180) * R
+            }));
+            let area = 0;
+            for (let i = 0; i < coords.length; i++) {
+                let j = (i + 1) % coords.length;
+                area += coords[i].x * coords[j].y - coords[j].x * coords[i].y;
+            }
+            document.getElementById('area-gps').innerText = (Math.abs(area) / 2).toLocaleString(undefined, {maximumFractionDigits: 1}) + " m²";
+        }
+
+        function dibujarMapaGPS() {
+            const svg = document.getElementById('svg-gps');
+            if (puntosGPS.length === 0) { svg.innerHTML = '<text x="50" y="50" fill="#94a3b8" text-anchor="middle" font-size="6">Polígono vacío</text>'; return; }
+            const origin = puntosGPS[0];
+            const coords = puntosGPS.map(p => ({ x: (p.lng - origin.lng) * (Math.PI / 180) * R * Math.cos(origin.lat * Math.PI / 180), y: (p.lat - origin.lat) * (Math.PI / 180) * R }));
+            const xs = coords.map(c => c.x), ys = coords.map(c => c.y);
+            const w = (Math.max(...xs) - Math.min(...xs)) || 2, h = (Math.max(...ys) - Math.min(...ys)) || 2;
+            const pad = Math.max(w, h) * 0.3 || 10;
+            
+            svg.setAttribute('viewBox', `${Math.min(...xs) - pad} ${Math.min(...ys) - pad} ${w + pad*2} ${h + pad*2}`);
+            let html = '';
+            if (coords.length > 1) {
+                const pts = coords.map(c => `${c.x},${-c.y}`).join(' ');
+                html += `<polyline points="${pts}" fill="rgba(59, 130, 246, 0.2)" stroke="#3b82f6" stroke-width="${pad/15}" stroke-linejoin="round" />`;
+                if (coords.length > 2) html += `<line x1="${coords[coords.length-1].x}" y1="${-coords[coords.length-1].y}" x2="${coords[0].x}" y2="${-coords[0].y}" stroke="#3b82f6" stroke-width="${pad/20}" stroke-dasharray="${pad/15}" opacity="0.4" />`;
+            }
+            coords.forEach((c, i) => {
+                const col = i === 0 ? '#10b981' : (i === coords.length-1 ? '#ef4444' : 'white');
+                html += `<circle cx="${c.x}" cy="${-c.y}" r="${pad/8}" fill="${col}" stroke="#0f172a" stroke-width="${pad/30}" />`;
+            });
+            svg.innerHTML = html;
+        }
+
+        function descargarGPS(formato) {
+            if (puntosGPS.length === 0) return showToast("Captura puntos primero");
+            let data = "", name = `GeoCAD_${new Date().toISOString().slice(0,10)}`;
+            
+            if (formato === 'kml') {
+                data = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n  <Document>\n    <name>${name}</name>\n    <Style id="polyStyle">\n      <LineStyle><color>ff0000ff</color><width>2</width></LineStyle>\n      <PolyStyle><color>400000ff</color></PolyStyle>\n    </Style>\n    <Placemark>\n      <name>Terreno Levantado</name>\n      <styleUrl>#polyStyle</styleUrl>\n      <Polygon>\n        <tessellate>1</tessellate>\n        <outerBoundaryIs>\n          <LinearRing>\n            <coordinates>\n              ${puntosGPS.map(p => `${p.lng},${p.lat},${p.alt}`).join('\n              ')}\n              ${puntosGPS.length > 2 ? `${puntosGPS[0].lng},${puntosGPS[0].lat},${puntosGPS[0].alt}` : ''}\n            </coordinates>\n          </LinearRing>\n        </outerBoundaryIs>\n      </Polygon>\n    </Placemark>\n  </Document>\n</kml>`;
+                name += ".kml";
+            } else if (formato === 'scr') {
+                data = "PDMODE 3\nPDSIZE 0.2\n";
+                puntosGPS.forEach(p => data += `_POINT ${p.lng},${p.lat},${p.alt}\n`);
+                if (puntosGPS.length > 2) data += "_PLINE\n" + puntosGPS.map(p => `${p.lng},${p.lat},${p.alt}`).join('\n') + "\n_CLOSE\n";
+                data += "_ZOOM _E\n";
+                name += ".scr";
+            }
+            triggerDescarga(data, name);
+        }
+
+        // === MANUAL ===
+        let coordManual = []; let refGpsManual = null; 
+
+        function guardarEstadoManual() {
+            localStorage.setItem('geoCad_manual', JSON.stringify({ l1: document.getElementById('l1').value, l2: document.getElementById('l2').value, l3: document.getElementById('l3').value, l4: document.getElementById('l4').value, d1: document.getElementById('d1').value, refGps: refGpsManual }));
+        }
+
+        function limpiarManual() {
+            if(confirm("¿Borrar medidas de cinta?")) {
+                document.getElementById('l1').value = ''; document.getElementById('l2').value = ''; document.getElementById('l3').value = ''; document.getElementById('l4').value = ''; document.getElementById('d1').value = ''; refGpsManual = null;
+                document.getElementById('gps-data-manual').innerText = "Sin coordenada.";
+                calcularManual();
+            }
+        }
+
+        function calcularManual() {
+            guardarEstadoManual();
+            const l1 = parseFloat(document.getElementById('l1').value), l2 = parseFloat(document.getElementById('l2').value), l3 = parseFloat(document.getElementById('l3').value), l4 = parseFloat(document.getElementById('l4').value), d1 = parseFloat(document.getElementById('d1').value);
+            const errDiv = document.getElementById('error-manual'), btnD = document.getElementById('btn-descarga-manual');
+            
+            coordManual = []; errDiv.classList.add('hidden'); btnD.disabled = true; btnD.classList.add('opacity-50', 'cursor-not-allowed');
+            document.getElementById('area-manual').innerText = "0 m²"; document.getElementById('perim-manual').innerText = "0 m";
+            
+            if (!l1 || !l2 || !l3 || !l4 || !d1) { document.getElementById('svg-manual').innerHTML = ''; return; }
+            if (l1 + l2 <= d1 || l1 + d1 <= l2 || l2 + d1 <= l1 || d1 + l3 <= l4 || d1 + l4 <= l3 || l3 + l4 <= d1) {
+                errDiv.innerText = "⚠️ Medidas incorrectas. Físicamente imposible."; errDiv.classList.remove('hidden'); document.getElementById('svg-manual').innerHTML = ''; return;
+            }
+
+            const pA = { x: 0, y: 0 }, pB = { x: l1, y: 0 };
+            const alpha = Math.acos((Math.pow(l1, 2) + Math.pow(d1, 2) - Math.pow(l2, 2)) / (2 * l1 * d1));
+            const pC = { x: d1 * Math.cos(alpha), y: d1 * Math.sin(alpha) };
+            const beta = Math.acos((Math.pow(d1, 2) + Math.pow(l4, 2) - Math.pow(l3, 2)) / (2 * d1 * l4));
+            const pD = { x: l4 * Math.cos(alpha + beta), y: l4 * Math.sin(alpha + beta) };
+
+            coordManual = [pA, pB, pC, pD];
+            const s1 = (l1 + l2 + d1) / 2, a1 = Math.sqrt(s1 * (s1 - l1) * (s1 - l2) * (s1 - d1));
+            const s2 = (d1 + l3 + l4) / 2, a2 = Math.sqrt(s2 * (s2 - d1) * (s2 - l3) * (s2 - l4));
+            
+            document.getElementById('area-manual').innerText = (a1 + a2).toLocaleString(undefined, {maximumFractionDigits: 1}) + " m²";
+            document.getElementById('perim-manual').innerText = (l1 + l2 + l3 + l4).toLocaleString(undefined, {maximumFractionDigits: 1}) + " m";
+            
+            btnD.disabled = false; btnD.classList.remove('opacity-50', 'cursor-not-allowed');
+            dibujarMapaManual();
+        }
+
+        function dibujarMapaManual() {
+            const svg = document.getElementById('svg-manual');
+            const xs = coordManual.map(p => p.x), ys = coordManual.map(p => p.y);
+            const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys), pad = Math.max(w, h) * 0.25;
+            svg.setAttribute('viewBox', `${Math.min(...xs) - pad} ${-Math.max(...ys) - pad} ${w + pad*2} ${h + pad*2}`);
+            
+            const pts = coordManual.map(p => `${p.x},${-p.y}`).join(' ');
+            let html = `<polygon points="${pts}" fill="rgba(16, 185, 129, 0.1)" stroke="#10b981" stroke-width="${pad/20}" stroke-linejoin="round" />`;
+            html += `<line x1="${coordManual[0].x}" y1="${-coordManual[0].y}" x2="${coordManual[2].x}" y2="${-coordManual[2].y}" stroke="#ef4444" stroke-width="${pad/30}" stroke-dasharray="${pad/10}" />`;
+            coordManual.forEach((p, i) => {
+                html += `<circle cx="${p.x}" cy="${-p.y}" r="${pad/12}" fill="#10b981" />`;
+                html += `<text x="${p.x}" y="${-p.y - pad/5}" fill="#334155" font-size="${pad/4}" text-anchor="middle" font-weight="bold">V${i+1}</text>`;
+            });
+            svg.innerHTML = html;
+        }
+
+        function capturarRefManual() {
+            if (!actualGPS) return showToast("No hay señal GPS");
+            refGpsManual = {...actualGPS}; guardarEstadoManual();
+            document.getElementById('gps-data-manual').innerHTML = `<span class="text-emerald-600 font-bold">Anclado</span> (Error ±${refGpsManual.acc.toFixed(1)}m)<br>Lat: ${refGpsManual.lat.toFixed(5)} | Lon: ${refGpsManual.lng.toFixed(5)}`;
+            showToast("Referencia guardada");
+        }
+
+        function descargarManual() {
+            if (coordManual.length === 0) return;
+            let data = "_PLINE\n"; coordManual.forEach(p => data += `${p.x.toFixed(4)},${p.y.toFixed(4)}\n`); data += "_CLOSE\n_ZOOM _E\n";
+            const cx = (coordManual[0].x + coordManual[2].x) / 2, cy = (coordManual[0].y + coordManual[2].y) / 2;
+            const th = Math.max(0.5, parseFloat(document.getElementById('l1').value) * 0.05).toFixed(2);
+            data += `_TEXT _J _MC ${cx.toFixed(4)},${cy.toFixed(4)}\n${th}\n0\nArea Exacta: ${document.getElementById('area-manual').innerText}\n`;
+            triggerDescarga(data, `TopoManual_${new Date().toISOString().slice(0,10)}.scr`);
+        }
+
+        function triggerDescarga(contenido, nombreArchivo) {
+            const blob = new Blob([contenido], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = nombreArchivo; a.click(); URL.revokeObjectURL(url);
+        }
+
+        window.addEventListener('load', () => {
+            const savedGPS = localStorage.getItem('geoCad_puntosGPS');
+            if (savedGPS) { puntosGPS = JSON.parse(savedGPS); if (puntosGPS.length > 0) { renderTablaGPS(); dibujarMapaGPS(); calcularAreaGPS(); } }
+            const savedManual = localStorage.getItem('geoCad_manual');
+            if (savedManual) {
+                const data = JSON.parse(savedManual);
+                ['l1','l2','l3','l4','d1'].forEach(id => { if(data[id]) document.getElementById(id).value = data[id]; });
+                if (data.refGps) { refGpsManual = data.refGps; document.getElementById('gps-data-manual').innerHTML = `<span class="text-emerald-600 font-bold">Anclado</span><br>Lat: ${refGpsManual.lat.toFixed(5)} | Lon: ${refGpsManual.lng.toFixed(5)}`; }
+                calcularManual();
+            }
+        });
+    </script>
+</body>
+</html>
