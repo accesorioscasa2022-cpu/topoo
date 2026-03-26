@@ -3,222 +3,455 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="description" content="GeoCAD Pro - Aplicación web para levantamientos topográficos con GPS y medición manual">
-    <meta name="theme-color" content="#0f172a">
+    <meta name="description" content="GeoCAD Pro - Aplicación profesional para levantamientos topográficos con GPS y medición manual">
+    <meta name="theme-color" content="#1e293b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>GeoCAD Pro - Topo & GPS</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>">
+    <title>GeoCAD Pro | Topografía & GPS</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { 
-            padding-bottom: env(safe-area-inset-bottom); 
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --dark: #1e293b;
+            --dark-light: #334155;
+            --light: #f8fafc;
+        }
+        
+        * {
             -webkit-tap-highlight-color: transparent;
+        }
+        
+        body { 
+            padding-bottom: env(safe-area-inset-bottom);
             font-size: 14px;
             overflow-x: hidden;
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
+        
         input[type="number"] { 
             font-size: 16px;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
         }
+        
         .map-bg {
             aspect-ratio: 1 / 1;
-            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-image: 
+                linear-gradient(rgba(148, 163, 184, 0.15) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(148, 163, 184, 0.15) 1px, transparent 1px);
             background-size: 20px 20px;
+            background-color: #ffffff;
         }
+        
         .map-container {
             overflow: hidden;
             cursor: grab;
             touch-action: none;
             position: relative;
         }
+        
         .map-container:active {
             cursor: grabbing;
         }
+        
         .map-container.panning {
             cursor: grabbing;
         }
+        
         button { 
-            touch-action: manipulation; 
+            touch-action: manipulation;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
+        
+        button:active {
+            transform: scale(0.96);
+        }
+        
         .toast {
             transition: opacity 0.3s, transform 0.3s;
             transform: translateY(100px);
             pointer-events: none;
         }
+        
         .toast.show {
             opacity: 1;
             transform: translateY(0);
             pointer-events: auto;
         }
-        @keyframes pulse-share {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-        }
-        .btn-share:hover { 
-            animation: pulse-share 0.3s ease-in-out; 
-        }
+        
         .modal-overlay {
             background: rgba(0,0,0,0.6);
-            backdrop-filter: blur(4px);
+            backdrop-filter: blur(8px);
         }
-        /* Controles de zoom */
+        
+        /* Controles de zoom profesionales */
         .zoom-controls {
             position: absolute;
-            bottom: 8px;
-            right: 8px;
+            bottom: 12px;
+            right: 12px;
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 6px;
             z-index: 20;
         }
+        
         .zoom-btn {
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
-            background: rgba(15, 23, 42, 0.8);
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--dark) 0%, var(--dark-light) 100%);
             color: white;
             border: none;
             font-size: 18px;
-            font-weight: bold;
+            font-weight: 600;
             display: flex;
             align-items: center;
             justify-content: center;
-            backdrop-filter: blur(4px);
-            transition: all 0.2s;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
+        
         .zoom-btn:hover {
-            background: rgba(15, 23, 42, 1);
-            transform: scale(1.1);
+            transform: scale(1.08);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.4);
         }
+        
         .zoom-btn:active {
-            transform: scale(0.95);
+            transform: scale(0.94);
         }
+        
         .zoom-level {
             position: absolute;
-            bottom: 8px;
-            left: 8px;
-            background: rgba(15, 23, 42, 0.8);
+            bottom: 12px;
+            left: 12px;
+            background: linear-gradient(135deg, var(--dark) 0%, var(--dark-light) 100%);
             color: white;
-            padding: 4px 8px;
+            padding: 5px 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 20;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        /* Header profesional */
+        .app-header {
+            background: linear-gradient(135deg, var(--dark) 0%, var(--dark-light) 100%);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+        
+        /* Tarjetas con sombra suave */
+        .card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            transition: all 0.2s ease;
+        }
+        
+        .card:hover {
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        }
+        
+        /* Botones primarios */
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        
+        .btn-primary:hover {
+            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+            transform: translateY(-1px);
+        }
+        
+        /* Botones de acción */
+        .btn-action {
+            background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
+            color: white;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+        
+        /* Displays de datos */
+        .data-display {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        
+        /* Badge de estado */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
             border-radius: 6px;
             font-size: 10px;
-            font-weight: bold;
-            backdrop-filter: blur(4px);
-            z-index: 20;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-        /* Ajustes generales de tipografía */
-        h1 { font-size: 1.1rem; }
-        h2 { font-size: 0.85rem; }
-        .text-display { font-size: 1.5rem; }
-        .text-display-lg { font-size: 1.8rem; }
-        .btn-text { font-size: 0.75rem; }
-        .label-text { font-size: 0.7rem; }
-        .table-text { font-size: 0.8rem; }
+        
+        .status-good { background: rgba(16, 185, 129, 0.15); color: #059669; }
+        .status-warning { background: rgba(245, 158, 11, 0.15); color: #d97706; }
+        .status-error { background: rgba(239, 68, 68, 0.15); color: #dc2626; }
+        
+        /* Animaciones */
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.1); }
+        }
+        
+        .pulse-dot {
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+        
+        @keyframes slide-up {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .slide-up {
+            animation: slide-up 0.3s ease-out;
+        }
+        
+        /* Scrollbar personalizado */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        /* Ajustes tipográficos */
+        h1 { 
+            font-size: 1.15rem; 
+            font-weight: 700;
+            letter-spacing: -0.3px;
+        }
+        
+        h2 { 
+            font-size: 0.85rem; 
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        
+        .text-display { 
+            font-size: 1.6rem; 
+            line-height: 1.2;
+        }
+        
+        .text-display-lg { 
+            font-size: 1.9rem; 
+            line-height: 1.2;
+        }
+        
+        .label-text { 
+            font-size: 0.65rem; 
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+        
+        /* Punto GPS más pequeño */
+        .gps-point {
+            stroke-width: 1.5;
+        }
+        
+        .gps-point-first {
+            fill: var(--success);
+            stroke: #064e3b;
+        }
+        
+        .gps-point-last {
+            fill: var(--danger);
+            stroke: #7f1d1d;
+        }
+        
+        .gps-point-normal {
+            fill: var(--primary);
+            stroke: #1e3a8a;
+        }
+        
+        /* Modal profesional */
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        /* Botón de captura flotante */
+        .capture-btn {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            box-shadow: 0 8px 30px rgba(59, 130, 246, 0.4), 0 0 0 4px rgba(59, 130, 246, 0.1);
+        }
+        
+        .capture-btn:active {
+            transform: scale(0.92);
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
+        }
     </style>
 </head>
-<body class="bg-slate-100 min-h-screen flex flex-col font-sans mb-12 text-sm select-none">
+<body class="min-h-screen flex flex-col mb-16">
 
-    <header class="bg-slate-900 text-white pt-4 pb-3 shadow-lg sticky top-0 z-50">
-        <div class="px-3 flex justify-between items-center">
+    <!-- Header Profesional -->
+    <header class="app-header text-white pt-4 pb-3 sticky top-0 z-50">
+        <div class="px-4 flex justify-between items-center">
             <div>
-                <h1 class="font-bold text-emerald-400">GeoCAD Pro</h1>
-                <p class="text-[10px] text-slate-300 font-medium tracking-widest flex items-center gap-1 mt-0.5">
-                    AUTOGUARDADO ON <span class="bg-emerald-500 w-1.5 h-1.5 rounded-full animate-pulse"></span>
-                </p>
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">🗺️</span>
+                    <h1 class="font-bold text-white">GeoCAD Pro</h1>
+                </div>
+                <div class="flex items-center gap-2 mt-1.5">
+                    <span class="status-badge status-good">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 pulse-dot"></span>
+                        Auto Guardado
+                    </span>
+                </div>
             </div>
-            <div id="descargas-gps" class="flex gap-1.5">
-                <button onclick="compartirGPS('kml')" class="btn-share px-2.5 py-1.5 bg-sky-500 rounded-lg text-[10px] font-bold shadow-md hover:bg-sky-400 flex items-center gap-1 transition">
-                    📤 .KML
+            
+            <!-- Botones de Exportar -->
+            <div id="descargas-gps" class="flex gap-2">
+                <button onclick="compartirGPS('kml')" class="btn-share px-3 py-2 bg-sky-500/90 hover:bg-sky-500 rounded-xl text-[10px] font-bold shadow-lg backdrop-blur-sm flex items-center gap-1.5">
+                    <span>📤</span> KML
                 </button>
-                <button onclick="compartirGPS('scr')" class="btn-share px-2.5 py-1.5 bg-blue-600 rounded-lg text-[10px] font-bold shadow-md hover:bg-blue-500 flex items-center gap-1 transition">
-                    📤 .SCR
+                <button onclick="compartirGPS('scr')" class="btn-share px-3 py-2 bg-blue-600/90 hover:bg-blue-600 rounded-xl text-[10px] font-bold shadow-lg backdrop-blur-sm flex items-center gap-1.5">
+                    <span>📤</span> SCR
                 </button>
             </div>
-            <div id="descargas-manual" class="hidden flex gap-1.5">
-                <button onclick="compartirManual()" id="btn-compartir-manual" class="btn-share px-2.5 py-1.5 bg-emerald-600 rounded-lg text-[10px] font-bold shadow-md opacity-50 cursor-not-allowed flex items-center gap-1 transition" disabled>
-                    📤 CAD
+            
+            <div id="descargas-manual" class="hidden flex gap-2">
+                <button onclick="compartirManual()" id="btn-compartir-manual" class="btn-share px-3 py-2 bg-emerald-600/90 hover:bg-emerald-600 rounded-xl text-[10px] font-bold shadow-lg backdrop-blur-sm opacity-50 cursor-not-allowed flex items-center gap-1.5" disabled>
+                    <span>📤</span> CAD
                 </button>
             </div>
         </div>
         
-        <div class="flex bg-slate-800 text-xs font-bold mt-2">
-            <button onclick="cambiarPestana('gps')" id="tab-gps" class="flex-1 py-3 border-b-4 border-blue-500 text-blue-400 transition-colors">
-                📍 GPS
+        <!-- Navegación por Pestañas -->
+        <div class="flex bg-white/10 backdrop-blur-sm rounded-xl mt-3 p-1">
+            <button onclick="cambiarPestana('gps')" id="tab-gps" class="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all bg-white/20 text-white shadow-sm">
+                <span class="mr-1.5">📍</span>GPS
             </button>
-            <button onclick="cambiarPestana('manual')" id="tab-manual" class="flex-1 py-3 border-b-4 border-transparent text-slate-400 transition-colors">
-                📐 CINTA
+            <button onclick="cambiarPestana('manual')" id="tab-manual" class="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all text-slate-300 hover:text-white">
+                <span class="mr-1.5">📐</span>CINTA
             </button>
         </div>
     </header>
 
-    <main class="flex-1 relative">
+    <main class="flex-1 relative p-4 space-y-4">
 
         <!-- VISTA GPS -->
-        <div id="vista-gps" class="p-3 space-y-4 pb-28">
+        <div id="vista-gps" class="space-y-4 pb-32">
             
-            <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
-                <div class="flex justify-between items-center mb-2">
-                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">SEÑAL GPS</span>
-                    <span id="gps-precision" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 font-bold text-slate-500">Buscando...</span>
+            <!-- Panel de Señal GPS -->
+            <div class="card p-4">
+                <div class="flex justify-between items-center mb-3">
+                    <span class="label-text text-slate-500">Señal GPS</span>
+                    <span id="gps-precision" class="status-badge status-warning">Buscando...</span>
                 </div>
-                <div id="gps-coords-display" class="grid grid-cols-3 gap-1.5 text-xs text-slate-700">
-                    <div class="bg-slate-50 p-2 rounded-lg text-center border border-slate-200 font-mono font-bold">LAT<br>---</div>
-                    <div class="bg-slate-50 p-2 rounded-lg text-center border border-slate-200 font-mono font-bold">LON<br>---</div>
-                    <div class="bg-slate-50 p-2 rounded-lg text-center border border-slate-200 font-mono font-bold">ALT<br>---</div>
+                <div id="gps-coords-display" class="grid grid-cols-3 gap-2 text-xs">
+                    <div class="bg-slate-50 p-2.5 rounded-xl text-center border border-slate-200 font-mono font-bold">
+                        <div class="label-text text-slate-400 mb-1">LAT</div>
+                        <div class="data-display text-slate-700">---</div>
+                    </div>
+                    <div class="bg-slate-50 p-2.5 rounded-xl text-center border border-slate-200 font-mono font-bold">
+                        <div class="label-text text-slate-400 mb-1">LON</div>
+                        <div class="data-display text-slate-700">---</div>
+                    </div>
+                    <div class="bg-slate-50 p-2.5 rounded-xl text-center border border-slate-200 font-mono font-bold">
+                        <div class="label-text text-slate-400 mb-1">ALT</div>
+                        <div class="data-display text-slate-700">---m</div>
+                    </div>
                 </div>
-                <div id="gps-error-panel" class="hidden mt-2 p-2 bg-red-50 rounded-lg border border-red-200 text-xs text-red-700 font-bold"></div>
+                <div id="gps-error-panel" class="hidden mt-3 p-3 bg-red-50 rounded-xl border border-red-200 text-xs text-red-700 font-semibold flex items-center gap-2">
+                    <span>⚠️</span>
+                    <span id="gps-error-text"></span>
+                </div>
             </div>
 
+            <!-- Estadísticas -->
             <div class="grid grid-cols-2 gap-3">
-                <div class="bg-blue-600 text-white p-4 rounded-xl shadow-md flex flex-col justify-center">
-                    <span class="text-[9px] uppercase opacity-80 font-bold tracking-wider">Área Estimada</span>
-                    <div id="area-gps" class="text-display font-black mt-0.5">0 m²</div>
+                <div class="card bg-gradient-to-br from-blue-500 to-blue-600 text-white p-4">
+                    <span class="label-text opacity-70">Área Estimada</span>
+                    <div id="area-gps" class="text-display font-black mt-1">0 m²</div>
                 </div>
-                <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between">
-                    <div class="flex justify-between items-start">
-                        <span class="text-[9px] uppercase text-slate-500 font-bold tracking-wider">Vértices</span>
-                        <button onclick="limpiarGPS()" class="text-red-500 bg-red-50 p-1.5 rounded-lg font-bold text-[9px] uppercase">Borrar</button>
+                <div class="card p-4">
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="label-text text-slate-500">Vértices</span>
+                        <button onclick="limpiarGPS()" class="text-red-500 bg-red-50 hover:bg-red-100 p-1.5 rounded-lg font-bold text-[9px] uppercase transition">
+                            🗑️
+                        </button>
                     </div>
                     <div id="contador-gps" class="text-display font-black text-slate-800">0</div>
                 </div>
             </div>
 
-            <!-- Mapa GPS con Pan & Zoom -->
-            <div class="bg-slate-900 rounded-xl shadow-xl overflow-hidden border border-slate-700 relative">
-                <div class="absolute top-2 left-2 z-10 bg-white/20 backdrop-blur px-2 py-0.5 rounded text-[9px] font-bold text-white flex items-center gap-1">
-                    🗺️ Croquis GPS
-                    <span id="gps-zoom-indicator" class="opacity-70"></span>
+            <!-- Mapa GPS con Pan & Zoom Extendido -->
+            <div class="card overflow-hidden relative bg-slate-900">
+                <div class="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg text-[10px] font-bold text-slate-700 shadow-sm flex items-center gap-2">
+                    <span>🗺️</span> Croquis GPS
+                    <span id="gps-zoom-indicator" class="text-slate-400 font-normal"></span>
                 </div>
-                <div class="map-bg map-container w-full" id="map-container-gps" style="height: 280px;">
+                <div class="map-bg map-container w-full" id="map-container-gps" style="height: 300px;">
                     <svg id="svg-gps" width="100%" height="100%" class="overflow-visible">
                         <g id="svg-content-gps">
-                            <text id="gps-placeholder" x="0" y="0" fill="#94a3b8" text-anchor="middle" font-size="12" transform="translate(140, 140)">Captura puntos para dibujar</text>
+                            <text id="gps-placeholder" x="0" y="0" fill="#94a3b8" text-anchor="middle" font-size="13" transform="translate(150, 150)">Captura puntos para dibujar</text>
                         </g>
                     </svg>
-                    <!-- Controles de Zoom -->
+                    <!-- Controles de Zoom Extendido -->
                     <div class="zoom-controls">
-                        <button class="zoom-btn" onclick="zoomIn('gps')" title="Acercar">+</button>
+                        <button class="zoom-btn" onclick="zoomIn('gps')" title="Acercar (Zoom In)">+</button>
                         <button class="zoom-btn" onclick="resetZoom('gps')" title="Vista completa">⌂</button>
-                        <button class="zoom-btn" onclick="zoomOut('gps')" title="Alejar">−</button>
+                        <button class="zoom-btn" onclick="zoomOut('gps')" title="Alejar (Zoom Out)">−</button>
                     </div>
                     <div class="zoom-level" id="zoom-level-gps">100%</div>
                 </div>
             </div>
 
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div class="max-h-[180px] overflow-y-auto">
-                    <table class="w-full text-xs text-left">
+            <!-- Lista de Puntos -->
+            <div class="card overflow-hidden">
+                <div class="px-4 py-3 border-b border-slate-100 bg-slate-50">
+                    <span class="label-text text-slate-500">Puntos Capturados</span>
+                </div>
+                <div class="max-h-[200px] overflow-y-auto">
+                    <table class="w-full text-xs">
                         <tbody id="lista-gps" class="divide-y divide-slate-100">
-                            <tr><td class="p-3 text-center text-slate-400 italic">Los puntos aparecerán aquí</td></tr>
+                            <tr><td class="p-4 text-center text-slate-400 italic">Los puntos aparecerán aquí</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
+            <!-- Botón de Captura Flotante -->
             <div class="fixed bottom-8 left-1/2 -translate-x-1/2 z-40">
-                <button onclick="capturarPuntoGPS()" class="bg-blue-600 text-white w-16 h-16 rounded-full shadow-[0_8px_25px_rgba(37,99,235,0.5)] flex items-center justify-center border-4 border-white active:scale-95 transition-transform">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <button onclick="capturarPuntoGPS()" class="capture-btn text-white w-18 h-18 rounded-full flex items-center justify-center border-4 border-white active:scale-95 transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-9 h-9" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </button>
@@ -226,62 +459,69 @@
         </div>
 
         <!-- VISTA MANUAL -->
-        <div id="vista-manual" class="hidden p-3 space-y-4">
+        <div id="vista-manual" class="hidden space-y-4">
             
-            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                <div class="flex justify-between items-center mb-3 border-b pb-2">
-                    <h2 class="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Medidas (Metros)</h2>
-                    <button onclick="limpiarManual()" class="text-[10px] text-red-600 font-bold bg-red-50 px-2.5 py-1.5 rounded-lg">LIMPIAR</button>
+            <!-- Panel de Medidas -->
+            <div class="card p-4">
+                <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-200">
+                    <h2 class="label-text text-slate-600">Medidas (Metros)</h2>
+                    <button onclick="limpiarManual()" class="text-xs text-red-600 font-bold bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition">
+                        🗑️ Limpiar Todo
+                    </button>
                 </div>
                 
                 <div class="grid grid-cols-2 gap-3">
-                    <div class="space-y-0.5">
-                        <label class="text-[9px] font-bold text-slate-500">Base (L1)</label>
-                        <input type="number" id="l1" step="0.01" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-base font-mono focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="10.00" oninput="calcularManual()">
+                    <div class="space-y-1">
+                        <label class="label-text text-slate-500">Base (L1)</label>
+                        <input type="number" id="l1" step="0.01" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-base font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="10.00" oninput="calcularManual()">
                     </div>
-                    <div class="space-y-0.5">
-                        <label class="text-[9px] font-bold text-slate-500">Derecha (L2)</label>
-                        <input type="number" id="l2" step="0.01" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-base font-mono focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="20.00" oninput="calcularManual()">
+                    <div class="space-y-1">
+                        <label class="label-text text-slate-500">Derecha (L2)</label>
+                        <input type="number" id="l2" step="0.01" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-base font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="20.00" oninput="calcularManual()">
                     </div>
-                    <div class="space-y-0.5">
-                        <label class="text-[9px] font-bold text-slate-500">Arriba (L3)</label>
-                        <input type="number" id="l3" step="0.01" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-base font-mono focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="10.00" oninput="calcularManual()">
+                    <div class="space-y-1">
+                        <label class="label-text text-slate-500">Arriba (L3)</label>
+                        <input type="number" id="l3" step="0.01" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-base font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="10.00" oninput="calcularManual()">
                     </div>
-                    <div class="space-y-0.5">
-                        <label class="text-[9px] font-bold text-slate-500">Izquierda (L4)</label>
-                        <input type="number" id="l4" step="0.01" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-base font-mono focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="20.00" oninput="calcularManual()">
+                    <div class="space-y-1">
+                        <label class="label-text text-slate-500">Izquierda (L4)</label>
+                        <input type="number" id="l4" step="0.01" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-base font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="20.00" oninput="calcularManual()">
                     </div>
                 </div>
-                <div class="mt-3 space-y-0.5">
-                    <label class="text-[9px] font-bold text-red-600 uppercase">Diagonal (D1)</label>
-                    <input type="number" id="d1" step="0.01" class="w-full bg-red-50 border border-red-300 rounded-lg p-2.5 text-base font-mono text-red-700 focus:ring-2 focus:ring-red-500 outline-none" placeholder="22.36" oninput="calcularManual()">
+                <div class="mt-3 space-y-1">
+                    <label class="label-text text-red-600">Diagonal (D1)</label>
+                    <input type="number" id="d1" step="0.01" class="w-full bg-red-50 border border-red-300 rounded-xl p-3 text-base font-mono text-red-700 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition" placeholder="22.36" oninput="calcularManual()">
                 </div>
-                <div id="error-manual" class="hidden mt-2 text-xs text-red-700 font-bold bg-red-100 p-2 rounded-lg border border-red-200"></div>
+                <div id="error-manual" class="hidden mt-3 text-xs text-red-700 font-bold bg-red-50 p-3 rounded-xl border border-red-200 flex items-center gap-2">
+                    <span>⚠️</span>
+                    <span id="error-manual-text"></span>
+                </div>
             </div>
 
+            <!-- Resultados -->
             <div class="grid grid-cols-2 gap-3">
-                <div class="bg-emerald-600 text-white p-4 rounded-xl shadow-md flex flex-col justify-center">
-                    <span class="text-[9px] uppercase opacity-80 font-bold tracking-wider">Área Exacta</span>
-                    <div id="area-manual" class="text-display font-black mt-0.5">0 m²</div>
+                <div class="card bg-gradient-to-br from-emerald-500 to-emerald-600 text-white p-4">
+                    <span class="label-text opacity-70">Área Exacta</span>
+                    <div id="area-manual" class="text-display font-black mt-1">0 m²</div>
                 </div>
-                <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-center">
-                    <span class="text-[9px] uppercase text-slate-500 font-bold tracking-wider">Perímetro</span>
-                    <div id="perim-manual" class="text-display-lg font-black text-slate-800 mt-0.5">0 m</div>
+                <div class="card p-4">
+                    <span class="label-text text-slate-500">Perímetro</span>
+                    <div id="perim-manual" class="text-display-lg font-black text-slate-800 mt-1">0 m</div>
                 </div>
             </div>
 
-            <!-- Mapa Manual con Pan & Zoom -->
-            <div class="bg-white rounded-xl shadow-xl overflow-hidden border border-slate-300 relative">
-                <div class="absolute top-2 left-2 z-10 bg-white/90 backdrop-blur px-2 py-0.5 rounded text-[9px] font-bold text-slate-600 shadow-sm">
+            <!-- Mapa Manual con Pan & Zoom Extendido -->
+            <div class="card overflow-hidden relative">
+                <div class="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg text-[10px] font-bold text-slate-700 shadow-sm">
                     📐 Forma Calculada
                 </div>
-                <div class="map-bg map-container w-full" id="map-container-manual" style="height: 280px;">
+                <div class="map-bg map-container w-full" id="map-container-manual" style="height: 300px;">
                     <svg id="svg-manual" width="100%" height="100%" class="overflow-visible">
                         <g id="svg-content-manual">
-                            <text id="manual-placeholder" x="0" y="0" fill="#94a3b8" text-anchor="middle" font-size="12" font-weight="bold" transform="translate(140, 140)">Faltan medidas...</text>
+                            <text id="manual-placeholder" x="0" y="0" fill="#94a3b8" text-anchor="middle" font-size="13" font-weight="600" transform="translate(150, 150)">Faltan medidas...</text>
                         </g>
                     </svg>
-                    <!-- Controles de Zoom -->
+                    <!-- Controles de Zoom Extendido -->
                     <div class="zoom-controls">
                         <button class="zoom-btn" onclick="zoomIn('manual')" title="Acercar">+</button>
                         <button class="zoom-btn" onclick="resetZoom('manual')" title="Vista completa">⌂</button>
@@ -291,21 +531,24 @@
                 </div>
             </div>
             
-            <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
-                <div class="flex justify-between items-center mb-1.5">
-                    <span class="text-[9px] font-bold text-slate-600 uppercase">Punto Global</span>
-                    <button onclick="capturarRefManual()" id="btn-gps-manual" class="text-[10px] bg-slate-800 text-white px-3 py-1.5 rounded-lg font-bold active:bg-slate-700">ANCLAR GPS</button>
+            <!-- Referencia GPS -->
+            <div class="card p-4">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="label-text text-slate-600">Punto Global</span>
+                    <button onclick="capturarRefManual()" id="btn-gps-manual" class="text-xs bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold transition">
+                        📍 Anclar GPS
+                    </button>
                 </div>
-                <div id="gps-data-manual" class="text-[10px] text-slate-500 font-mono mt-1.5">
-                    Sin coordenada. AutoCAD: X:0, Y:0.
+                <div id="gps-data-manual" class="text-[10px] text-slate-500 font-mono mt-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                    Sin coordenada. AutoCAD dibujará en X:0, Y:0.
                 </div>
             </div>
         </div>
 
     </main>
 
-    <!-- Toast Notification -->
-    <div id="toast" class="fixed bottom-1/2 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-4 py-2.5 rounded-full text-xs font-bold opacity-0 pointer-events-none z-50 toast shadow-2xl whitespace-nowrap max-w-[85vw] text-center">
+    <!-- Toast Notification Profesional -->
+    <div id="toast" class="fixed bottom-20 left-1/2 -translate-x-1/2 bg-slate-900/95 text-white px-5 py-3 rounded-full text-xs font-bold opacity-0 pointer-events-none z-50 toast shadow-2xl whitespace-nowrap max-w-[85vw] text-center backdrop-blur-sm border border-white/10">
         Notificación
     </div>
 
@@ -313,7 +556,7 @@
     <div id="modal-compartir" class="hidden"></div>
 
     <script>
-        // === SISTEMA PAN & ZOOM PARA MAPAS ===
+        // === SISTEMA PAN & ZOOM EXTENDIDO PARA MAPAS ===
         const mapState = {
             gps: { zoom: 1, panX: 0, panY: 0, isPanning: false, startX: 0, startY: 0, viewBox: { x: 0, y: 0, w: 100, h: 100 } },
             manual: { zoom: 1, panX: 0, panY: 0, isPanning: false, startX: 0, startY: 0, viewBox: { x: 0, y: 0, w: 100, h: 100 } }
@@ -355,7 +598,7 @@
             // Wheel zoom
             container.addEventListener('wheel', (e) => {
                 e.preventDefault();
-                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                const delta = e.deltaY > 0 ? 0.85 : 1.15;
                 applyZoom(tipo, delta);
             }, { passive: false });
 
@@ -379,7 +622,6 @@
             const state = mapState[tipo];
             if (!state.isPanning) return;
 
-            const container = document.getElementById(`map-container-${tipo}`);
             const deltaX = (e.clientX - state.startX) / state.zoom;
             const deltaY = (e.clientY - state.startY) / state.zoom;
 
@@ -417,7 +659,7 @@
         }
 
         function zoomIn(tipo) {
-            applyZoom(tipo, 1.3);
+            applyZoom(tipo, 1.4);
         }
 
         function zoomOut(tipo) {
@@ -436,9 +678,10 @@
 
         function applyZoom(tipo, factor) {
             const state = mapState[tipo];
-            const newZoom = Math.max(0.2, Math.min(5, state.zoom * factor));
+            // Zoom extendido: 0.1x a 10x (antes era 0.2x a 5x)
+            const newZoom = Math.max(0.1, Math.min(10, state.zoom * factor));
             
-            if (newZoom !== state.zoom) {
+            if (Math.abs(newZoom - state.zoom) > 0.01) {
                 state.zoom = newZoom;
                 updateMapView(tipo);
                 updateZoomIndicator(tipo);
@@ -458,7 +701,8 @@
             const indicator = document.getElementById(`zoom-level-${tipo}`);
             const state = mapState[tipo];
             if (indicator) {
-                indicator.textContent = `${Math.round(state.zoom * 100)}%`;
+                const zoomPercent = Math.round(state.zoom * 100);
+                indicator.textContent = zoomPercent >= 1000 ? '1000%+' : `${zoomPercent}%`;
             }
         }
 
@@ -469,19 +713,12 @@
             if (svg) {
                 svg.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
             }
-            // Resetear pan/zoom cuando cambia el viewBox
             state.panX = 0;
             state.panY = 0;
             state.zoom = 1;
             updateMapView(tipo);
             updateZoomIndicator(tipo);
         }
-
-        // Inicializar mapas al cargar
-        window.addEventListener('load', () => {
-            initMapPanZoom('gps');
-            initMapPanZoom('manual');
-        });
 
         // === UTILIDADES GENERALES ===
         function cambiarPestana(vista) {
@@ -492,14 +729,14 @@
             if (vista === 'gps') {
                 vGps.classList.remove('hidden'); vMan.classList.add('hidden');
                 dGps.classList.remove('hidden'); dMan.classList.add('hidden');
-                tGps.className = "flex-1 py-3 border-b-4 border-blue-500 text-blue-400 transition-colors";
-                tMan.className = "flex-1 py-3 border-b-4 border-transparent text-slate-400 transition-colors";
+                tGps.className = "flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all bg-white/20 text-white shadow-sm";
+                tMan.className = "flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all text-slate-300 hover:text-white";
                 setTimeout(() => initMapPanZoom('gps'), 100);
             } else {
                 vGps.classList.add('hidden'); vMan.classList.remove('hidden');
                 dGps.classList.add('hidden'); dMan.classList.remove('hidden');
-                tMan.className = "flex-1 py-3 border-b-4 border-emerald-500 text-emerald-400 transition-colors";
-                tGps.className = "flex-1 py-3 border-b-4 border-transparent text-slate-400 transition-colors";
+                tMan.className = "flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all bg-white/20 text-white shadow-sm";
+                tGps.className = "flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all text-slate-300 hover:text-white";
                 setTimeout(() => initMapPanZoom('manual'), 100);
             }
         }
@@ -508,7 +745,7 @@
             const t = document.getElementById('toast');
             t.innerText = msg;
             t.classList.add('show');
-            setTimeout(() => t.classList.remove('show'), 2000);
+            setTimeout(() => t.classList.remove('show'), 2500);
         }
 
         function triggerDescarga(contenido, nombreArchivo, tipoMime = 'text/plain') {
@@ -525,7 +762,7 @@
                 a.click();
                 document.body.removeChild(a);
                 setTimeout(() => URL.revokeObjectURL(url), 100);
-                showToast(`📥 ${nombreArchivo}`);
+                showToast(`📥 ${nombreArchivo} descargado`);
                 return true;
             } catch (e) {
                 console.error('Error en descarga:', e);
@@ -538,16 +775,17 @@
         async function compartirArchivo(contenido, nombreArchivo, tipoMime) {
             if (nombreArchivo.endsWith('.kml')) tipoMime = 'application/vnd.google-earth.kml+xml';
             
+            // ✅ Web Share API con archivos (funciona en Android Chrome, iOS Safari 13+)
             if (navigator.share) {
                 try {
                     const file = new File([contenido], nombreArchivo, { type: tipoMime });
                     if (navigator.canShare && navigator.canShare({ files: [file] })) {
                         await navigator.share({
-                            title: 'GeoCAD Pro - Levantamiento',
-                            text: 'Te comparto este levantamiento topográfico 🗺️',
+                            title: 'GeoCAD Pro - Levantamiento Topográfico',
+                            text: `🗺️ Levantamiento generado con GeoCAD Pro\n\n📊 Archivo: ${nombreArchivo}\n🔗 Formato: ${nombreArchivo.endsWith('.kml') ? 'KML (Google Earth)' : 'SCR (AutoCAD)'}`,
                             files: [file]
                         });
-                        showToast('✅ Enviado');
+                        showToast('✅ Enviado exitosamente');
                         return;
                     }
                 } catch (err) {
@@ -555,6 +793,7 @@
                 }
             }
             
+            // Fallback con modal de opciones
             mostrarOpcionesCompartir(contenido, nombreArchivo, tipoMime);
         }
 
@@ -562,47 +801,66 @@
             const existing = document.getElementById('modal-compartir');
             if (existing && !existing.classList.contains('hidden')) return;
             
-            const textoBase = encodeURIComponent(`🗺️ Levantamiento GeoCAD: ${nombreArchivo}`);
+            const textoBase = encodeURIComponent(`🗺️ Levantamiento GeoCAD Pro: ${nombreArchivo}\n\n📊 Área y coordenadas listas para importar.`);
             
             const modal = document.createElement('div');
             modal.id = 'modal-compartir';
             modal.className = 'fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4';
             modal.innerHTML = `
-                <div class="bg-white rounded-xl p-4 max-w-sm w-full shadow-2xl">
-                    <div class="flex justify-between items-center mb-3">
-                        <h3 class="font-bold text-sm text-slate-800">📤 Compartir</h3>
-                        <button onclick="cerrarModalCompartir()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+                <div class="modal-content p-5 max-w-sm w-full slide-up">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+                            <span>📤</span> Compartir Archivo
+                        </h3>
+                        <button onclick="cerrarModalCompartir()" class="text-slate-400 hover:text-slate-600 text-2xl font-bold transition">&times;</button>
                     </div>
                     
-                    <p class="text-xs text-slate-600 mb-3">Compartir <strong>${nombreArchivo}</strong>:</p>
+                    <p class="text-sm text-slate-600 mb-4">
+                        Elige cómo compartir <strong class="text-slate-800">${nombreArchivo}</strong>:
+                    </p>
                     
-                    <div class="space-y-2">
-                        <a href="https://wa.me/?text=${textoBase}%0A%0A💡 Descarga el archivo y adjúntalo manualmente." 
+                    <div class="space-y-2.5">
+                        <a href="https://wa.me/?text=${textoBase}%0A%0A💡 Tip: Descarga el archivo primero y luego adjúntalo manualmente en WhatsApp." 
                            target="_blank" rel="noopener"
-                           class="flex items-center gap-2 p-3 bg-[#25D366] text-white rounded-lg font-bold hover:bg-[#128C7E] transition text-sm">
-                            <span>💬</span> WhatsApp
+                           class="flex items-center gap-3 p-3.5 bg-[#25D366] text-white rounded-xl font-bold hover:bg-[#128C7E] transition shadow-md">
+                            <span class="text-xl">💬</span> 
+                            <div class="text-left">
+                                <div>WhatsApp</div>
+                                <div class="text-xs opacity-90 font-normal">Abrir chat + instrucciones</div>
+                            </div>
                         </a>
                         
                         <a href="https://t.me/share/url?url=${encodeURIComponent(window.location.href)}&text=${textoBase}" 
                            target="_blank" rel="noopener"
-                           class="flex items-center gap-2 p-3 bg-[#0088cc] text-white rounded-lg font-bold hover:bg-[#006699] transition text-sm">
-                            <span>✈️</span> Telegram
+                           class="flex items-center gap-3 p-3.5 bg-[#0088cc] text-white rounded-xl font-bold hover:bg-[#006699] transition shadow-md">
+                            <span class="text-xl">✈️</span>
+                            <div class="text-left">
+                                <div>Telegram</div>
+                                <div class="text-xs opacity-90 font-normal">Compartir enlace + datos</div>
+                            </div>
                         </a>
                         
-                        <a href="mailto:?subject=${encodeURIComponent('GeoCAD - ' + nombreArchivo)}&body=${encodeURIComponent(`Levantamiento: ${nombreArchivo}\n\nApp: ${window.location.href}`)}" 
-                           class="flex items-center gap-2 p-3 bg-slate-700 text-white rounded-lg font-bold hover:bg-slate-800 transition text-sm">
-                            <span>📧</span> Correo
+                        <a href="mailto:?subject=${encodeURIComponent('Levantamiento GeoCAD Pro - ' + nombreArchivo)}&body=${encodeURIComponent(`Hola,\n\nTe envío este levantamiento topográfico generado con GeoCAD Pro.\n\n📊 Archivo: ${nombreArchivo}\n🔗 App: ${window.location.href}\n\n💡 Nota: Adjunta el archivo .KML o .SCR manualmente desde tu dispositivo.\n\n---\nGeoCAD Pro - Topografía GPS & Manual`)}" 
+                           class="flex items-center gap-3 p-3.5 bg-slate-700 text-white rounded-xl font-bold hover:bg-slate-800 transition shadow-md">
+                            <span class="text-xl">📧</span>
+                            <div class="text-left">
+                                <div>Correo Electrónico</div>
+                                <div class="text-xs opacity-90 font-normal">Redactar email con datos</div>
+                            </div>
                         </a>
                         
                         <button onclick="cerrarModalCompartir(); triggerDescarga('${contenido.replace(/'/g, "\\'").replace(/\n/g, '\\n')}', '${nombreArchivo}', '${tipoMime}')" 
-                                class="w-full p-3 bg-slate-200 text-slate-700 rounded-lg font-bold hover:bg-slate-300 transition text-sm flex items-center justify-center gap-2">
-                            ⬇️ Descargar
+                                class="w-full p-3.5 bg-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-300 transition shadow-md flex items-center justify-center gap-2">
+                            <span>⬇️</span> Descargar archivo directamente
                         </button>
                     </div>
                     
-                    <p class="text-[10px] text-slate-500 mt-3 text-center">
-                        💡 WhatsApp no permite adjuntar archivos vía enlace. Descarga primero.
-                    </p>
+                    <div class="mt-4 p-3 bg-blue-50 rounded-xl border border-blue-100">
+                        <p class="text-[10px] text-slate-600 text-center leading-relaxed">
+                            <strong>💡 Nota sobre KML:</strong> El formato .KML es compatible con Google Earth, Google Maps, y la mayoría de software GIS. 
+                            El formato .KMZ es KML comprimido (requiere servidor). Para compartir, usa .KML directamente.
+                        </p>
+                    </div>
                 </div>
             `;
             document.body.appendChild(modal);
@@ -621,7 +879,7 @@
         }
 
         // === CONSTANTES ===
-        const R = 6371000;
+        const R = 6371000; // Radio de la Tierra en metros
 
         // === MÓDULO GPS ===
         let puntosGPS = [];
@@ -633,13 +891,13 @@
         }
 
         function limpiarGPS() {
-            if(confirm("¿Borrar todos los puntos GPS?")) {
+            if(confirm("¿Borrar todos los puntos GPS? Esta acción no se puede deshacer.")) {
                 puntosGPS = []; 
                 guardarEstadoGPS(); 
                 renderTablaGPS(); 
                 dibujarMapaGPS(); 
                 calcularAreaGPS();
-                showToast("🗑️ Borrado");
+                showToast("🗑️ Puntos borrados");
             }
         }
 
@@ -654,28 +912,42 @@
                     };
                     document.getElementById('gps-error-panel').classList.add('hidden');
                     document.getElementById('gps-coords-display').innerHTML = `
-                        <div class="bg-slate-50 p-2 rounded-lg text-center border border-slate-200 font-mono font-bold text-[10px]">LAT<br>${actualGPS.lat.toFixed(5)}</div>
-                        <div class="bg-slate-50 p-2 rounded-lg text-center border border-slate-200 font-mono font-bold text-[10px]">LON<br>${actualGPS.lng.toFixed(5)}</div>
-                        <div class="bg-slate-50 p-2 rounded-lg text-center border border-slate-200 font-mono font-bold text-[10px]">ALT<br>${actualGPS.alt.toFixed(0)}m</div>
+                        <div class="bg-slate-50 p-2.5 rounded-xl text-center border border-slate-200 font-mono font-bold text-[10px]">
+                            <div class="label-text text-slate-400 mb-0.5">LAT</div>
+                            <div class="data-display">${actualGPS.lat.toFixed(5)}</div>
+                        </div>
+                        <div class="bg-slate-50 p-2.5 rounded-xl text-center border border-slate-200 font-mono font-bold text-[10px]">
+                            <div class="label-text text-slate-400 mb-0.5">LON</div>
+                            <div class="data-display">${actualGPS.lng.toFixed(5)}</div>
+                        </div>
+                        <div class="bg-slate-50 p-2.5 rounded-xl text-center border border-slate-200 font-mono font-bold text-[10px]">
+                            <div class="label-text text-slate-400 mb-0.5">ALT</div>
+                            <div class="data-display">${actualGPS.alt.toFixed(0)}m</div>
+                        </div>
                     `;
                     const badge = document.getElementById('gps-precision');
-                    badge.innerText = `±${actualGPS.acc.toFixed(1)}m`;
-                    badge.className = `text-[10px] px-2 py-0.5 rounded-full font-bold text-white ${actualGPS.acc < 8 ? 'bg-green-600' : actualGPS.acc < 20 ? 'bg-orange-500' : 'bg-red-500'}`;
+                    const acc = actualGPS.acc.toFixed(1);
+                    badge.innerText = `±${acc}m`;
+                    badge.className = `status-badge ${acc < 8 ? 'status-good' : acc < 20 ? 'status-warning' : 'status-error'}`;
                 },
                 err => {
                     const ep = document.getElementById('gps-error-panel'); 
+                    const et = document.getElementById('gps-error-text');
                     ep.classList.remove('hidden');
-                    ep.innerText = err.code === 1 ? "⚠️ Permiso GPS denegado" : "📡 Buscando señal...";
+                    et.innerText = err.code === 1 ? "Permiso GPS denegado. Actívalo en configuración." : "Buscando señal GPS...";
                 },
                 { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
             );
         }
 
         function capturarPuntoGPS() {
-            if (!actualGPS) return showToast("⏳ Esperando GPS...");
-            puntosGPS.push({...actualGPS, id: Date.now()});
+            if (!actualGPS) return showToast("⏳ Esperando señal GPS...");
+            if (actualGPS.acc > 50) {
+                if(!confirm(`⚠️ Precisión baja (±${actualGPS.acc.toFixed(0)}m). ¿Capturar igual?`)) return;
+            }
+            puntosGPS.push({...actualGPS, id: Date.now(), timestamp: new Date().toISOString()});
             guardarEstadoGPS(); 
-            showToast(`✅ Punto #${puntosGPS.length}`);
+            showToast(`✅ Punto #${puntosGPS.length} capturado`);
             renderTablaGPS(); 
             dibujarMapaGPS(); 
             calcularAreaGPS();
@@ -688,13 +960,14 @@
                 renderTablaGPS(); 
                 dibujarMapaGPS(); 
                 calcularAreaGPS();
+                showToast("🗑️ Punto eliminado");
             }
         }
 
         function renderTablaGPS() {
             document.getElementById('contador-gps').innerText = puntosGPS.length;
             if (puntosGPS.length === 0) {
-                document.getElementById('lista-gps').innerHTML = '<tr><td class="p-3 text-center text-slate-400 italic text-xs">Captura puntos del perímetro</td></tr>';
+                document.getElementById('lista-gps').innerHTML = '<tr><td class="p-4 text-center text-slate-400 italic text-xs">Captura puntos caminando por el perímetro</td></tr>';
                 return;
             }
             const html = puntosGPS.slice().reverse().map(p => `
@@ -702,7 +975,7 @@
                     <td class="p-3 font-bold text-blue-600 text-xs">#${puntosGPS.length - puntosGPS.indexOf(p)}</td>
                     <td class="p-3 font-mono text-slate-600 text-[10px]">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</td>
                     <td class="p-3 text-right">
-                        <button onclick="eliminarPuntoGPS(${p.id})" class="text-red-500 font-bold bg-red-50 px-2 py-1 rounded text-[10px] hover:bg-red-100">X</button>
+                        <button onclick="eliminarPuntoGPS(${p.id})" class="text-red-500 font-bold bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg text-[10px] transition">Eliminar</button>
                     </td>
                 </tr>
             `).join('');
@@ -724,13 +997,14 @@
                 let j = (i + 1) % coords.length;
                 area += coords[i].x * coords[j].y - coords[j].x * coords[i].y;
             }
-            document.getElementById('area-gps').innerText = (Math.abs(area) / 2).toLocaleString(undefined, {maximumFractionDigits: 1}) + " m²";
+            const areaM2 = Math.abs(area) / 2;
+            document.getElementById('area-gps').innerText = areaM2.toLocaleString(undefined, {maximumFractionDigits: 1}) + " m²";
         }
 
         function dibujarMapaGPS() {
             const content = document.getElementById('svg-content-gps');
             if (puntosGPS.length === 0) { 
-                content.innerHTML = '<text x="0" y="0" fill="#94a3b8" text-anchor="middle" font-size="12" transform="translate(140, 140)">Captura puntos para dibujar</text>';
+                content.innerHTML = '<text x="0" y="0" fill="#94a3b8" text-anchor="middle" font-size="13" transform="translate(150, 150)">Captura puntos para dibujar</text>';
                 setMapViewBox('gps', -50, -50, 100, 100);
                 return; 
             }
@@ -743,31 +1017,35 @@
             const w = (Math.max(...xs) - Math.min(...xs)) || 2, h = (Math.max(...ys) - Math.min(...ys)) || 2;
             const pad = Math.max(w, h) * 0.3 || 10;
             
-            // Actualizar viewBox
             setMapViewBox('gps', Math.min(...xs) - pad, Math.min(...ys) - pad, w + pad*2, h + pad*2);
             
             let html = '';
             
             if (coords.length > 1) {
                 const pts = coords.map(c => `${c.x},${-c.y}`).join(' ');
-                html += `<polyline points="${pts}" fill="rgba(59, 130, 246, 0.2)" stroke="#3b82f6" stroke-width="${Math.max(0.3, pad/15)}" stroke-linejoin="round" />`;
+                const fillOpacity = coords.length >= 3 ? '0.15' : '0';
+                html += `<polyline points="${pts}" fill="rgba(59, 130, 246, ${fillOpacity})" stroke="#3b82f6" stroke-width="1.5" stroke-linejoin="round" />`;
                 if (coords.length > 2) {
-                    html += `<line x1="${coords[coords.length-1].x}" y1="${-coords[coords.length-1].y}" x2="${coords[0].x}" y2="${-coords[0].y}" stroke="#3b82f6" stroke-width="${Math.max(0.2, pad/20)}" stroke-dasharray="${Math.max(1, pad/15)}" opacity="0.4" />`;
+                    html += `<line x1="${coords[coords.length-1].x}" y1="${-coords[coords.length-1].y}" x2="${coords[0].x}" y2="${-coords[0].y}" stroke="#3b82f6" stroke-width="1" stroke-dasharray="4,4" opacity="0.5" />`;
                 }
             }
-            coords.forEach((c, i) => {
-                const color = i === 0 ? '#10b981' : i === coords.length-1 ? '#ef4444' : '#3b82f6';
-                html += `<circle cx="${c.x}" cy="${-c.y}" r="${Math.max(0.8, pad/12)}" fill="${color}" stroke="#0f172a" stroke-width="${Math.max(0.1, pad/40)}" />`;
-                html += `<text x="${c.x + 2}" y="${-c.y - 2}" fill="#475569" font-size="${Math.max(3, pad/8)}" font-weight="bold">${i+1}</text>`;
-            });
-            content.innerHTML = html;
             
-            // Auto-zoom para mostrar todos los puntos
+            // Círculos más pequeños y profesionales (radio reducido de pad/12 a pad/20)
+            coords.forEach((c, i) => {
+                const esInicio = i === 0, esActual = i === coords.length - 1;
+                const radio = Math.max(3, pad/20); // Radio más pequeño
+                const clase = esInicio ? 'gps-point-first' : esActual ? 'gps-point-last' : 'gps-point-normal';
+                html += `<circle class="gps-point ${clase}" cx="${c.x}" cy="${-c.y}" r="${radio}" />`;
+                // Numerar vértices con fuente más pequeña
+                html += `<text x="${c.x + radio*2.5}" y="${-c.y - radio}" fill="#64748b" font-size="${Math.max(8, pad/12)}" font-weight="600">${i+1}</text>`;
+            });
+            
+            content.innerHTML = html;
             resetZoom('gps');
         }
 
         function compartirGPS(formato) {
-            if (puntosGPS.length === 0) return showToast("⚠️ Captura puntos primero");
+            if (puntosGPS.length === 0) return showToast("⚠️ Captura al menos 3 puntos primero");
             
             let data = "", name = `GeoCAD_${new Date().toISOString().slice(0,10)}`, tipoMime = 'text/plain';
             
@@ -779,18 +1057,23 @@
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
     <name>${name}</name>
+    <description>Levantamiento topográfico generado con GeoCAD Pro - ${new Date().toLocaleDateString('es-ES')}</description>
     <Style id="polyStyle">
       <LineStyle><color>ff0000ff</color><width>3</width></LineStyle>
-      <PolyStyle><color>400000ff</color></PolyStyle>
+      <PolyStyle><color>400000ff</color><outline>1</outline><fill>1</fill></PolyStyle>
     </Style>
     <Placemark>
-      <name>Terreno</name>
+      <name>Terreno Levantado</name>
+      <description>Área: ${document.getElementById('area-gps').innerText} | Vértices: ${puntosGPS.length}</description>
       <styleUrl>#polyStyle</styleUrl>
       <Polygon>
         <tessellate>1</tessellate>
+        <altitudeMode>clampToGround</altitudeMode>
         <outerBoundaryIs>
           <LinearRing>
-            <coordinates>${coordsBlock}${cierre}</coordinates>
+            <coordinates>
+              ${coordsBlock}${cierre}
+            </coordinates>
           </LinearRing>
         </outerBoundaryIs>
       </Polygon>
@@ -800,10 +1083,16 @@
                 name += ".kml";
                 tipoMime = 'application/vnd.google-earth.kml+xml';
             } else if (formato === 'scr') {
-                data = "PDMODE 3\nPDSIZE 0.2\n";
-                puntosGPS.forEach(p => data += `_POINT ${p.lng},${p.lat},${p.alt || 0}\n`);
+                data = "; GeoCAD Pro - Script AutoCAD\n";
+                data += "; Generado: " + new Date().toLocaleString('es-ES') + "\n";
+                data += "PDMODE 3\nPDSIZE 0.2\n";
+                puntosGPS.forEach((p, i) => {
+                    data += `_POINT ${p.lng},${p.lat},${p.alt || 0} ; Punto #${i+1}\n`;
+                });
                 if (puntosGPS.length > 2) {
-                    data += "_PLINE\n" + puntosGPS.map(p => `${p.lng},${p.lat},${p.alt || 0}`).join('\n') + "\n_CLOSE\n";
+                    data += "\n; Dibujar polígono\n_PLINE\n";
+                    puntosGPS.forEach(p => data += `${p.lng},${p.lat},${p.alt || 0}\n`);
+                    data += "_CLOSE\n";
                 }
                 data += "_ZOOM _E\n";
                 name += ".scr";
@@ -831,14 +1120,15 @@
         }
 
         function limpiarManual() {
-            if(confirm("¿Borrar medidas?")) {
+            if(confirm("¿Borrar todas las medidas de cinta?")) {
                 ['l1','l2','l3','l4','d1'].forEach(id => document.getElementById(id).value = '');
                 refGpsManual = null;
-                document.getElementById('gps-data-manual').innerText = "Sin coordenada.";
+                document.getElementById('gps-data-manual').innerText = "Sin coordenada. AutoCAD dibujará en X:0, Y:0.";
                 document.getElementById('error-manual').classList.add('hidden');
                 document.getElementById('btn-compartir-manual').disabled = true;
                 document.getElementById('btn-compartir-manual').classList.add('opacity-50', 'cursor-not-allowed');
                 calcularManual();
+                showToast("🗑️ Medidas borradas");
             }
         }
 
@@ -851,7 +1141,8 @@
                   d1 = parseFloat(document.getElementById('d1').value);
             
             const errDiv = document.getElementById('error-manual'), 
-                  btnD = document.getElementById('btn-compartir-manual');
+                  btnD = document.getElementById('btn-compartir-manual'),
+                  errText = document.getElementById('error-manual-text');
             
             coordManual = []; 
             errDiv.classList.add('hidden'); 
@@ -861,7 +1152,7 @@
             document.getElementById('perim-manual').innerText = "0 m";
             
             const content = document.getElementById('svg-content-manual');
-            content.innerHTML = '<text x="0" y="0" fill="#94a3b8" text-anchor="middle" font-size="12" font-weight="bold" transform="translate(140, 140)">Ingresa medidas...</text>';
+            content.innerHTML = '<text x="0" y="0" fill="#94a3b8" text-anchor="middle" font-size="13" font-weight="600" transform="translate(150, 150)">Ingresa medidas...</text>';
             setMapViewBox('manual', -50, -50, 100, 100);
             
             if (!l1 || !l2 || !l3 || !l4 || !d1) return;
@@ -870,7 +1161,7 @@
             const validTri2 = (d1 + l3 > l4) && (d1 + l4 > l3) && (l3 + l4 > d1);
             
             if (!validTri1 || !validTri2) {
-                errDiv.innerText = "⚠️ Medidas inválidas"; 
+                errText.innerText = "Medidas inválidas: No forman triángulos válidos. Revisa las longitudes.";
                 errDiv.classList.remove('hidden'); 
                 return;
             }
@@ -908,13 +1199,14 @@
             setMapViewBox('manual', Math.min(...xs) - pad, -Math.max(...ys) - pad, w + pad*2, h + pad*2);
             
             const pts = coordManual.map(p => `${p.x},${-p.y}`).join(' ');
-            let html = `<polygon points="${pts}" fill="rgba(16, 185, 129, 0.15)" stroke="#10b981" stroke-width="${Math.max(0.4, pad/25)}" stroke-linejoin="round" />`;
-            html += `<line x1="${coordManual[0].x}" y1="${-coordManual[0].y}" x2="${coordManual[2].x}" y2="${-coordManual[2].y}" stroke="#ef4444" stroke-width="${Math.max(0.2, pad/35)}" stroke-dasharray="${Math.max(1, pad/12)}" opacity="0.7" />`;
+            let html = `<polygon points="${pts}" fill="rgba(16, 185, 129, 0.15)" stroke="#10b981" stroke-width="1.5" stroke-linejoin="round" />`;
+            html += `<line x1="${coordManual[0].x}" y1="${-coordManual[0].y}" x2="${coordManual[2].x}" y2="${-coordManual[2].y}" stroke="#ef4444" stroke-width="1" stroke-dasharray="4,4" opacity="0.7" />`;
             
             const labels = ['A', 'B', 'C', 'D'];
             coordManual.forEach((p, i) => {
-                html += `<circle cx="${p.x}" cy="${-p.y}" r="${Math.max(0.6, pad/15)}" fill="#10b981" stroke="white" stroke-width="${Math.max(0.1, pad/50)}" />`;
-                html += `<text x="${p.x}" y="${-p.y - 1}" fill="#1e293b" font-size="${Math.max(2.5, pad/6)}" text-anchor="middle" font-weight="bold">${labels[i]}</text>`;
+                const radio = Math.max(3, pad/20);
+                html += `<circle cx="${p.x}" cy="${-p.y}" r="${radio}" fill="#10b981" stroke="white" stroke-width="1.5" />`;
+                html += `<text x="${p.x}" y="${-p.y - radio - 2}" fill="#1e293b" font-size="${Math.max(9, pad/8)}" text-anchor="middle" font-weight="700">${labels[i]}</text>`;
             });
             
             content.innerHTML = html;
@@ -922,32 +1214,38 @@
         }
 
         function capturarRefManual() {
-            if (!actualGPS) return showToast("⏳ Sin GPS");
+            if (!actualGPS) return showToast("⏳ No hay señal GPS disponible");
             refGpsManual = {...actualGPS}; 
             guardarEstadoManual();
-            document.getElementById('gps-data-manual').innerHTML = `<span class="text-emerald-600 font-bold">✅ Anclado</span><br>Lat: ${refGpsManual.lat.toFixed(5)} | Lon: ${refGpsManual.lng.toFixed(5)}`;
-            showToast("📍 Guardado");
+            document.getElementById('gps-data-manual').innerHTML = `<span class="text-emerald-600 font-bold">✅ Anclado</span> (±${refGpsManual.acc.toFixed(1)}m)<br><span class="font-mono">Lat: ${refGpsManual.lat.toFixed(5)} | Lon: ${refGpsManual.lng.toFixed(5)}</span>`;
+            showToast("📍 Referencia GPS guardada");
         }
 
         function compartirManual() {
-            if (coordManual.length !== 4) return showToast("⚠️ Calcula primero");
+            if (coordManual.length !== 4) return showToast("⚠️ Primero completa y calcula las medidas");
             
-            let data = "; GeoCAD Pro - AutoCAD\n";
+            let data = "; GeoCAD Pro - Script AutoCAD (Medición Manual)\n";
+            data += "; Generado: " + new Date().toLocaleString('es-ES') + "\n";
+            data += "; Área: " + document.getElementById('area-manual').innerText + " | Perímetro: " + document.getElementById('perim-manual').innerText + "\n\n";
+            
             data += "_PLINE\n"; 
-            coordManual.forEach(p => data += `${p.x.toFixed(4)},${p.y.toFixed(4)}\n`); 
-            data += "_CLOSE\n_ZOOM _E\n";
+            coordManual.forEach((p, i) => {
+                data += `${p.x.toFixed(4)},${p.y.toFixed(4)} ; Vértice ${String.fromCharCode(65+i)}\n`;
+            }); 
+            data += "_CLOSE\n";
             
             const cx = (coordManual[0].x + coordManual[2].x) / 2, 
                   cy = (coordManual[0].y + coordManual[2].y) / 2;
             const th = Math.max(0.5, parseFloat(document.getElementById('l1').value || 10) * 0.05).toFixed(2);
             data += `_TEXT _J _MC ${cx.toFixed(4)},${cy.toFixed(4)}\n${th}\n0\nAREA: ${document.getElementById('area-manual').innerText}\n`;
+            data += "_ZOOM _E\n";
             
-            compartirArchivo(data, `TopoManual_${new Date().toISOString().slice(0,10)}.scr`, 'text/plain');
+            const nombreArchivo = `TopoManual_${new Date().toISOString().slice(0,10)}.scr`;
+            compartirArchivo(data, nombreArchivo, 'text/plain');
         }
 
         // === INICIALIZACIÓN ===
         window.addEventListener('load', () => {
-            // Inicializar sistema Pan & Zoom
             initMapPanZoom('gps');
             initMapPanZoom('manual');
             
@@ -972,7 +1270,7 @@
                     });
                     if (data.refGps) { 
                         refGpsManual = data.refGps; 
-                        document.getElementById('gps-data-manual').innerHTML = `<span class="text-emerald-600 font-bold">✅ Anclado</span><br>Lat: ${refGpsManual.lat.toFixed(5)} | Lon: ${refGpsManual.lng.toFixed(5)}`; 
+                        document.getElementById('gps-data-manual').innerHTML = `<span class="text-emerald-600 font-bold">✅ Anclado</span><br><span class="font-mono">Lat: ${refGpsManual.lat.toFixed(5)} | Lon: ${refGpsManual.lng.toFixed(5)}</span>`; 
                     }
                     if (data.l1 && data.l2 && data.l3 && data.l4 && data.d1) {
                         calcularManual();
