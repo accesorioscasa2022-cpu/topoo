@@ -15,15 +15,28 @@
         body { 
             padding-bottom: env(safe-area-inset-bottom); 
             -webkit-tap-highlight-color: transparent;
-            font-size: 14px; /* Tamaño base reducido */
+            font-size: 14px;
+            overflow-x: hidden;
         }
         input[type="number"] { 
-            font-size: 16px; /* Evita zoom en iOS pero más pequeño */
+            font-size: 16px;
         }
         .map-bg {
             aspect-ratio: 1 / 1;
             background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
             background-size: 20px 20px;
+        }
+        .map-container {
+            overflow: hidden;
+            cursor: grab;
+            touch-action: none;
+            position: relative;
+        }
+        .map-container:active {
+            cursor: grabbing;
+        }
+        .map-container.panning {
+            cursor: grabbing;
         }
         button { 
             touch-action: manipulation; 
@@ -49,6 +62,51 @@
             background: rgba(0,0,0,0.6);
             backdrop-filter: blur(4px);
         }
+        /* Controles de zoom */
+        .zoom-controls {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            z-index: 20;
+        }
+        .zoom-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.8);
+            color: white;
+            border: none;
+            font-size: 18px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+            transition: all 0.2s;
+        }
+        .zoom-btn:hover {
+            background: rgba(15, 23, 42, 1);
+            transform: scale(1.1);
+        }
+        .zoom-btn:active {
+            transform: scale(0.95);
+        }
+        .zoom-level {
+            position: absolute;
+            bottom: 8px;
+            left: 8px;
+            background: rgba(15, 23, 42, 0.8);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: bold;
+            backdrop-filter: blur(4px);
+            z-index: 20;
+        }
         /* Ajustes generales de tipografía */
         h1 { font-size: 1.1rem; }
         h2 { font-size: 0.85rem; }
@@ -69,7 +127,6 @@
                     AUTOGUARDADO ON <span class="bg-emerald-500 w-1.5 h-1.5 rounded-full animate-pulse"></span>
                 </p>
             </div>
-            <!-- Botones GPS con compartir -->
             <div id="descargas-gps" class="flex gap-1.5">
                 <button onclick="compartirGPS('kml')" class="btn-share px-2.5 py-1.5 bg-sky-500 rounded-lg text-[10px] font-bold shadow-md hover:bg-sky-400 flex items-center gap-1 transition">
                     📤 .KML
@@ -78,7 +135,6 @@
                     📤 .SCR
                 </button>
             </div>
-            <!-- Botones Manual con compartir -->
             <div id="descargas-manual" class="hidden flex gap-1.5">
                 <button onclick="compartirManual()" id="btn-compartir-manual" class="btn-share px-2.5 py-1.5 bg-emerald-600 rounded-lg text-[10px] font-bold shadow-md opacity-50 cursor-not-allowed flex items-center gap-1 transition" disabled>
                     📤 CAD
@@ -128,12 +184,25 @@
                 </div>
             </div>
 
+            <!-- Mapa GPS con Pan & Zoom -->
             <div class="bg-slate-900 rounded-xl shadow-xl overflow-hidden border border-slate-700 relative">
-                <div class="absolute top-2 left-2 z-10 bg-white/20 backdrop-blur px-2 py-0.5 rounded text-[9px] font-bold text-white">Croquis GPS</div>
-                <div class="map-bg w-full flex items-center justify-center p-2">
-                    <svg id="svg-gps" width="100%" height="100%" viewBox="0 0 100 100" class="overflow-visible">
-                        <text id="gps-placeholder" x="50" y="50" fill="#94a3b8" text-anchor="middle" font-size="5">Captura puntos</text>
+                <div class="absolute top-2 left-2 z-10 bg-white/20 backdrop-blur px-2 py-0.5 rounded text-[9px] font-bold text-white flex items-center gap-1">
+                    🗺️ Croquis GPS
+                    <span id="gps-zoom-indicator" class="opacity-70"></span>
+                </div>
+                <div class="map-bg map-container w-full" id="map-container-gps" style="height: 280px;">
+                    <svg id="svg-gps" width="100%" height="100%" class="overflow-visible">
+                        <g id="svg-content-gps">
+                            <text id="gps-placeholder" x="0" y="0" fill="#94a3b8" text-anchor="middle" font-size="12" transform="translate(140, 140)">Captura puntos para dibujar</text>
+                        </g>
                     </svg>
+                    <!-- Controles de Zoom -->
+                    <div class="zoom-controls">
+                        <button class="zoom-btn" onclick="zoomIn('gps')" title="Acercar">+</button>
+                        <button class="zoom-btn" onclick="resetZoom('gps')" title="Vista completa">⌂</button>
+                        <button class="zoom-btn" onclick="zoomOut('gps')" title="Alejar">−</button>
+                    </div>
+                    <div class="zoom-level" id="zoom-level-gps">100%</div>
                 </div>
             </div>
 
@@ -201,14 +270,24 @@
                 </div>
             </div>
 
+            <!-- Mapa Manual con Pan & Zoom -->
             <div class="bg-white rounded-xl shadow-xl overflow-hidden border border-slate-300 relative">
                 <div class="absolute top-2 left-2 z-10 bg-white/90 backdrop-blur px-2 py-0.5 rounded text-[9px] font-bold text-slate-600 shadow-sm">
-                    Forma Calculada
+                    📐 Forma Calculada
                 </div>
-                <div class="map-bg w-full flex items-center justify-center p-3">
-                    <svg id="svg-manual" width="100%" height="100%" viewBox="0 0 100 100" class="overflow-visible">
-                        <text id="manual-placeholder" x="50" y="50" fill="#94a3b8" text-anchor="middle" font-size="5" font-weight="bold">Faltan medidas...</text>
+                <div class="map-bg map-container w-full" id="map-container-manual" style="height: 280px;">
+                    <svg id="svg-manual" width="100%" height="100%" class="overflow-visible">
+                        <g id="svg-content-manual">
+                            <text id="manual-placeholder" x="0" y="0" fill="#94a3b8" text-anchor="middle" font-size="12" font-weight="bold" transform="translate(140, 140)">Faltan medidas...</text>
+                        </g>
                     </svg>
+                    <!-- Controles de Zoom -->
+                    <div class="zoom-controls">
+                        <button class="zoom-btn" onclick="zoomIn('manual')" title="Acercar">+</button>
+                        <button class="zoom-btn" onclick="resetZoom('manual')" title="Vista completa">⌂</button>
+                        <button class="zoom-btn" onclick="zoomOut('manual')" title="Alejar">−</button>
+                    </div>
+                    <div class="zoom-level" id="zoom-level-manual">100%</div>
                 </div>
             </div>
             
@@ -234,6 +313,176 @@
     <div id="modal-compartir" class="hidden"></div>
 
     <script>
+        // === SISTEMA PAN & ZOOM PARA MAPAS ===
+        const mapState = {
+            gps: { zoom: 1, panX: 0, panY: 0, isPanning: false, startX: 0, startY: 0, viewBox: { x: 0, y: 0, w: 100, h: 100 } },
+            manual: { zoom: 1, panX: 0, panY: 0, isPanning: false, startX: 0, startY: 0, viewBox: { x: 0, y: 0, w: 100, h: 100 } }
+        };
+
+        function initMapPanZoom(tipo) {
+            const container = document.getElementById(`map-container-${tipo}`);
+            const svg = document.getElementById(`svg-${tipo}`);
+            const state = mapState[tipo];
+
+            // Eventos mouse
+            container.addEventListener('mousedown', (e) => startPan(e, tipo));
+            container.addEventListener('mousemove', (e) => doPan(e, tipo));
+            container.addEventListener('mouseup', () => endPan(tipo));
+            container.addEventListener('mouseleave', () => endPan(tipo));
+
+            // Eventos touch
+            container.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) {
+                    startPan(e.touches[0], tipo);
+                } else if (e.touches.length === 2) {
+                    e.preventDefault();
+                    startPinch(e, tipo);
+                }
+            }, { passive: false });
+
+            container.addEventListener('touchmove', (e) => {
+                if (e.touches.length === 1 && state.isPanning) {
+                    doPan(e.touches[0], tipo);
+                    e.preventDefault();
+                } else if (e.touches.length === 2) {
+                    e.preventDefault();
+                    doPinch(e, tipo);
+                }
+            }, { passive: false });
+
+            container.addEventListener('touchend', () => endPan(tipo));
+
+            // Wheel zoom
+            container.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                applyZoom(tipo, delta);
+            }, { passive: false });
+
+            // Guardar viewBox inicial
+            const content = document.getElementById(`svg-content-${tipo}`);
+            if (content) {
+                const bbox = content.getBBox();
+                state.viewBox = { x: bbox.x, y: bbox.y, w: bbox.width || 100, h: bbox.height || 100 };
+            }
+        }
+
+        function startPan(e, tipo) {
+            const state = mapState[tipo];
+            state.isPanning = true;
+            state.startX = e.clientX;
+            state.startY = e.clientY;
+            document.getElementById(`map-container-${tipo}`).classList.add('panning');
+        }
+
+        function doPan(e, tipo) {
+            const state = mapState[tipo];
+            if (!state.isPanning) return;
+
+            const container = document.getElementById(`map-container-${tipo}`);
+            const deltaX = (e.clientX - state.startX) / state.zoom;
+            const deltaY = (e.clientY - state.startY) / state.zoom;
+
+            state.panX += deltaX;
+            state.panY += deltaY;
+            state.startX = e.clientX;
+            state.startY = e.clientY;
+
+            updateMapView(tipo);
+        }
+
+        function endPan(tipo) {
+            const state = mapState[tipo];
+            state.isPanning = false;
+            document.getElementById(`map-container-${tipo}`).classList.remove('panning');
+        }
+
+        function startPinch(e, tipo) {
+            const state = mapState[tipo];
+            state.pinchStartDist = getPinchDistance(e.touches);
+            state.pinchStartZoom = state.zoom;
+        }
+
+        function doPinch(e, tipo) {
+            const state = mapState[tipo];
+            const currentDist = getPinchDistance(e.touches);
+            const scale = currentDist / state.pinchStartDist;
+            applyZoom(tipo, scale * state.pinchStartZoom / state.zoom);
+        }
+
+        function getPinchDistance(touches) {
+            const dx = touches[0].clientX - touches[1].clientX;
+            const dy = touches[0].clientY - touches[1].clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        function zoomIn(tipo) {
+            applyZoom(tipo, 1.3);
+        }
+
+        function zoomOut(tipo) {
+            applyZoom(tipo, 0.7);
+        }
+
+        function resetZoom(tipo) {
+            const state = mapState[tipo];
+            state.zoom = 1;
+            state.panX = 0;
+            state.panY = 0;
+            updateMapView(tipo);
+            updateZoomIndicator(tipo);
+            showToast('🔍 Vista reseteada');
+        }
+
+        function applyZoom(tipo, factor) {
+            const state = mapState[tipo];
+            const newZoom = Math.max(0.2, Math.min(5, state.zoom * factor));
+            
+            if (newZoom !== state.zoom) {
+                state.zoom = newZoom;
+                updateMapView(tipo);
+                updateZoomIndicator(tipo);
+            }
+        }
+
+        function updateMapView(tipo) {
+            const content = document.getElementById(`svg-content-${tipo}`);
+            const state = mapState[tipo];
+            
+            if (content) {
+                content.setAttribute('transform', `translate(${state.panX}, ${state.panY}) scale(${state.zoom})`);
+            }
+        }
+
+        function updateZoomIndicator(tipo) {
+            const indicator = document.getElementById(`zoom-level-${tipo}`);
+            const state = mapState[tipo];
+            if (indicator) {
+                indicator.textContent = `${Math.round(state.zoom * 100)}%`;
+            }
+        }
+
+        function setMapViewBox(tipo, x, y, w, h) {
+            const state = mapState[tipo];
+            state.viewBox = { x, y, w, h };
+            const svg = document.getElementById(`svg-${tipo}`);
+            if (svg) {
+                svg.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
+            }
+            // Resetear pan/zoom cuando cambia el viewBox
+            state.panX = 0;
+            state.panY = 0;
+            state.zoom = 1;
+            updateMapView(tipo);
+            updateZoomIndicator(tipo);
+        }
+
+        // Inicializar mapas al cargar
+        window.addEventListener('load', () => {
+            initMapPanZoom('gps');
+            initMapPanZoom('manual');
+        });
+
         // === UTILIDADES GENERALES ===
         function cambiarPestana(vista) {
             const vGps = document.getElementById('vista-gps'), vMan = document.getElementById('vista-manual');
@@ -245,11 +494,13 @@
                 dGps.classList.remove('hidden'); dMan.classList.add('hidden');
                 tGps.className = "flex-1 py-3 border-b-4 border-blue-500 text-blue-400 transition-colors";
                 tMan.className = "flex-1 py-3 border-b-4 border-transparent text-slate-400 transition-colors";
+                setTimeout(() => initMapPanZoom('gps'), 100);
             } else {
                 vGps.classList.add('hidden'); vMan.classList.remove('hidden');
                 dGps.classList.add('hidden'); dMan.classList.remove('hidden');
                 tMan.className = "flex-1 py-3 border-b-4 border-emerald-500 text-emerald-400 transition-colors";
                 tGps.className = "flex-1 py-3 border-b-4 border-transparent text-slate-400 transition-colors";
+                setTimeout(() => initMapPanZoom('manual'), 100);
             }
         }
 
@@ -312,7 +563,6 @@
             if (existing && !existing.classList.contains('hidden')) return;
             
             const textoBase = encodeURIComponent(`🗺️ Levantamiento GeoCAD: ${nombreArchivo}`);
-            const nombreEncoded = encodeURIComponent(nombreArchivo);
             
             const modal = document.createElement('div');
             modal.id = 'modal-compartir';
@@ -478,9 +728,10 @@
         }
 
         function dibujarMapaGPS() {
-            const svg = document.getElementById('svg-gps');
+            const content = document.getElementById('svg-content-gps');
             if (puntosGPS.length === 0) { 
-                svg.innerHTML = '<text x="50" y="50" fill="#94a3b8" text-anchor="middle" font-size="4">Vacío</text>'; 
+                content.innerHTML = '<text x="0" y="0" fill="#94a3b8" text-anchor="middle" font-size="12" transform="translate(140, 140)">Captura puntos para dibujar</text>';
+                setMapViewBox('gps', -50, -50, 100, 100);
                 return; 
             }
             const origin = puntosGPS[0];
@@ -492,7 +743,9 @@
             const w = (Math.max(...xs) - Math.min(...xs)) || 2, h = (Math.max(...ys) - Math.min(...ys)) || 2;
             const pad = Math.max(w, h) * 0.3 || 10;
             
-            svg.setAttribute('viewBox', `${Math.min(...xs) - pad} ${Math.min(...ys) - pad} ${w + pad*2} ${h + pad*2}`);
+            // Actualizar viewBox
+            setMapViewBox('gps', Math.min(...xs) - pad, Math.min(...ys) - pad, w + pad*2, h + pad*2);
+            
             let html = '';
             
             if (coords.length > 1) {
@@ -505,8 +758,12 @@
             coords.forEach((c, i) => {
                 const color = i === 0 ? '#10b981' : i === coords.length-1 ? '#ef4444' : '#3b82f6';
                 html += `<circle cx="${c.x}" cy="${-c.y}" r="${Math.max(0.8, pad/12)}" fill="${color}" stroke="#0f172a" stroke-width="${Math.max(0.1, pad/40)}" />`;
+                html += `<text x="${c.x + 2}" y="${-c.y - 2}" fill="#475569" font-size="${Math.max(3, pad/8)}" font-weight="bold">${i+1}</text>`;
             });
-            svg.innerHTML = html;
+            content.innerHTML = html;
+            
+            // Auto-zoom para mostrar todos los puntos
+            resetZoom('gps');
         }
 
         function compartirGPS(formato) {
@@ -602,7 +859,10 @@
             btnD.classList.add('opacity-50', 'cursor-not-allowed');
             document.getElementById('area-manual').innerText = "0 m²"; 
             document.getElementById('perim-manual').innerText = "0 m";
-            document.getElementById('svg-manual').innerHTML = '<text x="50" y="50" fill="#94a3b8" text-anchor="middle" font-size="4" font-weight="bold">Ingresa medidas...</text>';
+            
+            const content = document.getElementById('svg-content-manual');
+            content.innerHTML = '<text x="0" y="0" fill="#94a3b8" text-anchor="middle" font-size="12" font-weight="bold" transform="translate(140, 140)">Ingresa medidas...</text>';
+            setMapViewBox('manual', -50, -50, 100, 100);
             
             if (!l1 || !l2 || !l3 || !l4 || !d1) return;
             
@@ -640,12 +900,12 @@
 
         function dibujarMapaManual() {
             if (coordManual.length !== 4) return;
-            const svg = document.getElementById('svg-manual');
+            const content = document.getElementById('svg-content-manual');
             const xs = coordManual.map(p => p.x), ys = coordManual.map(p => p.y);
             const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys);
             const pad = Math.max(w, h) * 0.25 + 2;
             
-            svg.setAttribute('viewBox', `${Math.min(...xs) - pad} ${-Math.max(...ys) - pad} ${w + pad*2} ${h + pad*2}`);
+            setMapViewBox('manual', Math.min(...xs) - pad, -Math.max(...ys) - pad, w + pad*2, h + pad*2);
             
             const pts = coordManual.map(p => `${p.x},${-p.y}`).join(' ');
             let html = `<polygon points="${pts}" fill="rgba(16, 185, 129, 0.15)" stroke="#10b981" stroke-width="${Math.max(0.4, pad/25)}" stroke-linejoin="round" />`;
@@ -657,7 +917,8 @@
                 html += `<text x="${p.x}" y="${-p.y - 1}" fill="#1e293b" font-size="${Math.max(2.5, pad/6)}" text-anchor="middle" font-weight="bold">${labels[i]}</text>`;
             });
             
-            svg.innerHTML = html;
+            content.innerHTML = html;
+            resetZoom('manual');
         }
 
         function capturarRefManual() {
@@ -686,6 +947,10 @@
 
         // === INICIALIZACIÓN ===
         window.addEventListener('load', () => {
+            // Inicializar sistema Pan & Zoom
+            initMapPanZoom('gps');
+            initMapPanZoom('manual');
+            
             try {
                 const savedGPS = localStorage.getItem('geoCad_puntosGPS');
                 if (savedGPS) { 
