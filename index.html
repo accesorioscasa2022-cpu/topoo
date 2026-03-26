@@ -3,11 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="GeoCAD Pro - Aplicación web para levantamientos topográficos con GPS y medición manual">
+    <meta name="theme-color" content="#0f172a">
+    <!-- Cache control para GitHub Pages -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>GeoCAD Pro - Topo & GPS</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { padding-bottom: env(safe-area-inset-bottom); }
-        input[type="number"] { font-size: 18px; } /* Tamaño grande nativo */
+        body { padding-bottom: env(safe-area-inset-bottom); -webkit-tap-highlight-color: transparent; }
+        input[type="number"] { font-size: 18px; }
         .map-bg {
             aspect-ratio: 1 / 1;
             background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
@@ -17,14 +24,27 @@
         .toast {
             transition: opacity 0.3s, transform 0.3s;
             transform: translateY(100px);
+            pointer-events: none;
         }
         .toast.show {
             opacity: 1;
             transform: translateY(0);
+            pointer-events: auto;
+        }
+        /* Animación para botones de compartir */
+        @keyframes pulse-share {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .btn-share:hover { animation: pulse-share 0.3s ease-in-out; }
+        /* Modal de compartir */
+        .modal-overlay {
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
         }
     </style>
 </head>
-<body class="bg-slate-100 min-h-screen flex flex-col font-sans mb-12 text-base">
+<body class="bg-slate-100 min-h-screen flex flex-col font-sans mb-12 text-base select-none">
 
     <header class="bg-slate-900 text-white pt-5 shadow-lg sticky top-0 z-50">
         <div class="px-4 flex justify-between items-center pb-4">
@@ -34,13 +54,19 @@
                     AUTOGUARDADO ON <span class="bg-emerald-500 w-2 h-2 rounded-full animate-pulse"></span>
                 </p>
             </div>
+            <!-- Botones GPS con compartir -->
             <div id="descargas-gps" class="flex gap-2">
-                <button onclick="descargarGPS('kml')" class="px-3 py-2 bg-sky-500 rounded-lg text-xs font-bold shadow-md hover:bg-sky-400">.KML</button>
-                <button onclick="descargarGPS('scr')" class="px-3 py-2 bg-blue-600 rounded-lg text-xs font-bold shadow-md">.SCR</button>
+                <button onclick="compartirGPS('kml')" class="btn-share px-3 py-2 bg-sky-500 rounded-lg text-xs font-bold shadow-md hover:bg-sky-400 flex items-center gap-1 transition">
+                    📤 .KML
+                </button>
+                <button onclick="compartirGPS('scr')" class="btn-share px-3 py-2 bg-blue-600 rounded-lg text-xs font-bold shadow-md hover:bg-blue-500 flex items-center gap-1 transition">
+                    📤 .SCR
+                </button>
             </div>
+            <!-- Botones Manual con compartir -->
             <div id="descargas-manual" class="hidden flex gap-2">
-                <button onclick="descargarManual()" id="btn-descarga-manual" class="px-3 py-2 bg-emerald-600 rounded-lg text-xs font-bold shadow-md opacity-50 cursor-not-allowed" disabled>
-                    CAD .SCR
+                <button onclick="compartirManual()" id="btn-compartir-manual" class="btn-share px-3 py-2 bg-emerald-600 rounded-lg text-xs font-bold shadow-md opacity-50 cursor-not-allowed flex items-center gap-1 transition" disabled>
+                    📤 CAD .SCR
                 </button>
             </div>
         </div>
@@ -57,6 +83,7 @@
 
     <main class="flex-1 relative">
 
+        <!-- VISTA GPS -->
         <div id="vista-gps" class="p-4 space-y-5 pb-32">
             
             <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
@@ -114,6 +141,7 @@
             </div>
         </div>
 
+        <!-- VISTA MANUAL -->
         <div id="vista-manual" class="hidden p-4 space-y-5">
             
             <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
@@ -182,11 +210,16 @@
 
     </main>
 
-    <div id="toast" class="fixed bottom-1/2 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-5 py-3 rounded-full text-sm font-bold opacity-0 pointer-events-none z-50 toast shadow-2xl whitespace-nowrap">
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-1/2 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-5 py-3 rounded-full text-sm font-bold opacity-0 pointer-events-none z-50 toast shadow-2xl whitespace-nowrap max-w-[90vw] text-center">
         Notificación
     </div>
 
+    <!-- Modal de Compartir (se inyecta dinámicamente) -->
+    <div id="modal-compartir" class="hidden"></div>
+
     <script>
+        // === UTILIDADES GENERALES ===
         function cambiarPestana(vista) {
             const vGps = document.getElementById('vista-gps'), vMan = document.getElementById('vista-manual');
             const tGps = document.getElementById('tab-gps'), tMan = document.getElementById('tab-manual');
@@ -209,27 +242,182 @@
             const t = document.getElementById('toast');
             t.innerText = msg;
             t.classList.add('show');
-            setTimeout(() => t.classList.remove('show'), 2000);
+            setTimeout(() => t.classList.remove('show'), 2500);
         }
 
-        const R = 6371000; 
-
-        // === GPS ===
-        let puntosGPS = [];
-        let actualGPS = null;
-
-        function guardarEstadoGPS() { localStorage.setItem('geoCad_puntosGPS', JSON.stringify(puntosGPS)); }
-
-        function limpiarGPS() {
-            if(confirm("¿Borrar TODOS los puntos GPS?")) {
-                puntosGPS = []; guardarEstadoGPS(); renderTablaGPS(); dibujarMapaGPS(); calcularAreaGPS();
+        // Función de descarga mejorada con MIME types correctos
+        function triggerDescarga(contenido, nombreArchivo, tipoMime = 'text/plain') {
+            if (nombreArchivo.endsWith('.kml')) tipoMime = 'application/vnd.google-earth.kml+xml';
+            if (nombreArchivo.endsWith('.scr')) tipoMime = 'text/plain';
+            
+            try {
+                const blob = new Blob([contenido], { type: tipoMime });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = nombreArchivo;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 100);
+                showToast(`📥 ${nombreArchivo} descargado`);
+                return true;
+            } catch (e) {
+                console.error('Error en descarga:', e);
+                showToast('❌ Error al descargar');
+                return false;
             }
         }
 
+        // === FUNCIONES DE COMPARTIR ===
+        async function compartirArchivo(contenido, nombreArchivo, tipoMime) {
+            // Ajustar MIME type
+            if (nombreArchivo.endsWith('.kml')) tipoMime = 'application/vnd.google-earth.kml+xml';
+            
+            // ✅ Opción 1: Web Share API (navegadores modernos con HTTPS)
+            if (navigator.share) {
+                try {
+                    // Preparar archivo para compartir
+                    const file = new File([contenido], nombreArchivo, { type: tipoMime });
+                    
+                    // Verificar si se puede compartir archivos
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        await navigator.share({
+                            title: 'GeoCAD Pro - Levantamiento',
+                            text: 'Te comparto este levantamiento topográfico generado con GeoCAD Pro 🗺️',
+                            files: [file]
+                        });
+                        showToast('✅ Enviado exitosamente');
+                        return;
+                    }
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.log('Web Share no disponible, usando fallback:', err);
+                    }
+                }
+            }
+            
+            // ✅ Opción 2: Fallback con modal de opciones
+            mostrarOpcionesCompartir(contenido, nombreArchivo, tipoMime);
+        }
+
+        function mostrarOpcionesCompartir(contenido, nombreArchivo, tipoMime) {
+            // Evitar múltiples modales
+            const existing = document.getElementById('modal-compartir');
+            if (existing && !existing.classList.contains('hidden')) return;
+            
+            // Codificar contenido para URLs (limitado a ~2000 chars para compatibilidad)
+            const contenidoCorto = encodeURIComponent(contenido.slice(0, 1500));
+            const nombreEncoded = encodeURIComponent(nombreArchivo);
+            const textoBase = encodeURIComponent(`🗺️ Levantamiento GeoCAD Pro: ${nombreArchivo}\n\nÁrea calculada y coordenadas listas para importar.`);
+            
+            const modal = document.createElement('div');
+            modal.id = 'modal-compartir';
+            modal.className = 'fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4';
+            modal.innerHTML = `
+                <div class="bg-white rounded-2xl p-5 max-w-sm w-full shadow-2xl transform transition-all scale-100">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-lg text-slate-800">📤 Compartir archivo</h3>
+                        <button onclick="cerrarModalCompartir()" class="text-slate-400 hover:text-slate-600 text-2xl font-bold">&times;</button>
+                    </div>
+                    
+                    <p class="text-sm text-slate-600 mb-4">Elige cómo quieres compartir <strong>${nombreArchivo}</strong>:</p>
+                    
+                    <div class="space-y-3">
+                        <!-- WhatsApp -->
+                        <a href="https://wa.me/?text=${textoBase}%0A%0A📎 Archivo: ${nombreEncoded}%0A💡 Tip: Descarga el archivo y adjúntalo manualmente en WhatsApp." 
+                           target="_blank" rel="noopener"
+                           class="flex items-center gap-3 p-4 bg-[#25D366] text-white rounded-xl font-bold hover:bg-[#128C7E] transition shadow-md">
+                            <span class="text-xl">💬</span> 
+                            <div class="text-left">
+                                <div>WhatsApp</div>
+                                <div class="text-xs opacity-90 font-normal">Abrir chat + instrucciones</div>
+                            </div>
+                        </a>
+                        
+                        <!-- Telegram -->
+                        <a href="https://t.me/share/url?url=${encodeURIComponent(window.location.href)}&text=${textoBase}%0A%0A📎 Descarga el archivo .KML/.SCR desde: ${window.location.href}" 
+                           target="_blank" rel="noopener"
+                           class="flex items-center gap-3 p-4 bg-[#0088cc] text-white rounded-xl font-bold hover:bg-[#006699] transition shadow-md">
+                            <span class="text-xl">✈️</span>
+                            <div class="text-left">
+                                <div>Telegram</div>
+                                <div class="text-xs opacity-90 font-normal">Compartir enlace + datos</div>
+                            </div>
+                        </a>
+                        
+                        <!-- Email -->
+                        <a href="mailto:?subject=${encodeURIComponent('Levantamiento GeoCAD Pro - ' + nombreArchivo)}&body=${encodeURIComponent(`Hola,\n\nTe envío este levantamiento topográfico generado con GeoCAD Pro.\n\n📊 Archivo: ${nombreArchivo}\n🔗 App: ${window.location.href}\n\n💡 Nota: Adjunta el archivo .KML o .SCR manualmente desde tu dispositivo.\n\n---\nGeoCAD Pro - Topografía GPS & Manual`)}" 
+                           class="flex items-center gap-3 p-4 bg-slate-700 text-white rounded-xl font-bold hover:bg-slate-800 transition shadow-md">
+                            <span class="text-xl">📧</span>
+                            <div class="text-left">
+                                <div>Correo Electrónico</div>
+                                <div class="text-xs opacity-90 font-normal">Redactar email con datos</div>
+                            </div>
+                        </a>
+                        
+                        <!-- Descargar como fallback -->
+                        <button onclick="cerrarModalCompartir(); triggerDescarga('${contenido.replace(/'/g, "\\'").replace(/\n/g, '\\n')}', '${nombreArchivo}', '${tipoMime}')" 
+                                class="w-full p-4 bg-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-300 transition shadow-md flex items-center justify-center gap-2">
+                            <span>⬇️</span> Descargar archivo directamente
+                        </button>
+                    </div>
+                    
+                    <p class="text-xs text-slate-500 mt-4 text-center">
+                        💡 <strong>Tip:</strong> WhatsApp/Telegram no permiten adjuntar archivos vía enlace. 
+                        Descarga el archivo primero y luego adjúntalo manualmente en la app.
+                    </p>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            // Cerrar al hacer clic fuera del modal
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) cerrarModalCompartir();
+            });
+        }
+
+        function cerrarModalCompartir() {
+            const modal = document.getElementById('modal-compartir');
+            if (modal) {
+                modal.classList.add('hidden');
+                setTimeout(() => modal.remove(), 200);
+            }
+        }
+
+        // === CONSTANTES Y VARIABLES GLOBALES ===
+        const R = 6371000; // Radio de la Tierra en metros
+
+        // === MÓDULO GPS ===
+        let puntosGPS = [];
+        let actualGPS = null;
+
+        function guardarEstadoGPS() { 
+            try { localStorage.setItem('geoCad_puntosGPS', JSON.stringify(puntosGPS)); } 
+            catch(e) { console.log('LocalStorage GPS:', e); }
+        }
+
+        function limpiarGPS() {
+            if(confirm("¿Borrar TODOS los puntos GPS? Esta acción no se puede deshacer.")) {
+                puntosGPS = []; 
+                guardarEstadoGPS(); 
+                renderTablaGPS(); 
+                dibujarMapaGPS(); 
+                calcularAreaGPS();
+                showToast("🗑️ Puntos GPS borrados");
+            }
+        }
+
+        // Inicializar GPS
         if (navigator.geolocation) {
             navigator.geolocation.watchPosition(
                 pos => {
-                    actualGPS = { lat: pos.coords.latitude, lng: pos.coords.longitude, alt: pos.coords.altitude || 0, acc: pos.coords.accuracy };
+                    actualGPS = { 
+                        lat: pos.coords.latitude, 
+                        lng: pos.coords.longitude, 
+                        alt: pos.coords.altitude || 0, 
+                        acc: pos.coords.accuracy 
+                    };
                     document.getElementById('gps-error-panel').classList.add('hidden');
                     document.getElementById('gps-coords-display').innerHTML = `
                         <div class="bg-slate-50 p-3 rounded-lg text-center border border-slate-200 font-mono font-bold">LAT<br>${actualGPS.lat.toFixed(5)}</div>
@@ -237,45 +425,74 @@
                         <div class="bg-slate-50 p-3 rounded-lg text-center border border-slate-200 font-mono font-bold">ALT<br>${actualGPS.alt.toFixed(0)}m</div>
                     `;
                     const badge = document.getElementById('gps-precision');
-                    badge.innerText = `Precisión ±${actualGPS.acc.toFixed(1)}m`;
-                    badge.className = `text-xs px-3 py-1 rounded-full font-bold text-white ${actualGPS.acc < 8 ? 'bg-green-600' : 'bg-orange-500'}`;
+                    const precision = actualGPS.acc.toFixed(1);
+                    badge.innerText = `±${precision}m`;
+                    badge.className = `text-xs px-3 py-1 rounded-full font-bold text-white ${actualGPS.acc < 8 ? 'bg-green-600' : actualGPS.acc < 20 ? 'bg-orange-500' : 'bg-red-500'}`;
                 },
                 err => {
-                    const ep = document.getElementById('gps-error-panel'); ep.classList.remove('hidden');
-                    ep.innerText = err.code === 1 ? "⚠️ Permiso GPS denegado. Actívalo en el candado." : "Buscando satélites...";
+                    const ep = document.getElementById('gps-error-panel'); 
+                    ep.classList.remove('hidden');
+                    switch(err.code) {
+                        case 1: ep.innerText = "⚠️ Permiso GPS denegado. Actívalo en configuración del navegador."; break;
+                        case 2: ep.innerText = "📡 Señal GPS débil. Busca un lugar abierto."; break;
+                        case 3: ep.innerText = "⏱️ Tiempo de espera agotado. Reintentando..."; break;
+                        default: ep.innerText = "❌ Error de GPS: " + err.message;
+                    }
                 },
                 { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
             );
+        } else {
+            document.getElementById('gps-error-panel').classList.remove('hidden');
+            document.getElementById('gps-error-panel').innerText = "❌ Tu navegador no soporta Geolocalización";
         }
 
         function capturarPuntoGPS() {
-            if (!actualGPS) return showToast("Esperando señal...");
-            puntosGPS.push({...actualGPS, id: puntosGPS.length + 1});
-            guardarEstadoGPS(); showToast(`Punto #${puntosGPS.length} OK`);
-            renderTablaGPS(); dibujarMapaGPS(); calcularAreaGPS();
+            if (!actualGPS) return showToast("⏳ Esperando señal GPS...");
+            if (actualGPS.acc > 50) {
+                if(!confirm(`⚠️ Precisión baja (±${actualGPS.acc.toFixed(0)}m). ¿Capturar igual?`)) return;
+            }
+            puntosGPS.push({...actualGPS, id: Date.now(), timestamp: new Date().toISOString()});
+            guardarEstadoGPS(); 
+            showToast(`✅ Punto #${puntosGPS.length} capturado`);
+            renderTablaGPS(); 
+            dibujarMapaGPS(); 
+            calcularAreaGPS();
         }
 
         function eliminarPuntoGPS(id) {
-            puntosGPS = puntosGPS.filter(p => p.id !== id);
-            guardarEstadoGPS(); renderTablaGPS(); dibujarMapaGPS(); calcularAreaGPS();
+            if(confirm("¿Eliminar este punto?")) {
+                puntosGPS = puntosGPS.filter(p => p.id !== id);
+                guardarEstadoGPS(); 
+                renderTablaGPS(); 
+                dibujarMapaGPS(); 
+                calcularAreaGPS();
+                showToast("🗑️ Punto eliminado");
+            }
         }
 
         function renderTablaGPS() {
             document.getElementById('contador-gps').innerText = puntosGPS.length;
+            if (puntosGPS.length === 0) {
+                document.getElementById('lista-gps').innerHTML = '<tr><td class="p-5 text-center text-slate-400 italic">Captura puntos caminando por el perímetro</td></tr>';
+                return;
+            }
             const html = puntosGPS.slice().reverse().map(p => `
-                <tr class="bg-white border-b border-slate-100">
-                    <td class="p-4 font-black text-blue-600">#${p.id}</td>
+                <tr class="bg-white border-b border-slate-100 hover:bg-slate-50 transition">
+                    <td class="p-4 font-black text-blue-600">#${puntosGPS.length - puntosGPS.indexOf(p)}</td>
                     <td class="p-4 font-mono text-slate-600 text-sm">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</td>
                     <td class="p-4 text-right">
-                        <button onclick="eliminarPuntoGPS(${p.id})" class="text-red-500 font-bold bg-red-50 px-3 py-2 rounded-lg text-xs">X</button>
+                        <button onclick="eliminarPuntoGPS(${p.id})" class="text-red-500 font-bold bg-red-50 px-3 py-2 rounded-lg text-xs hover:bg-red-100 transition">X</button>
                     </td>
                 </tr>
             `).join('');
-            document.getElementById('lista-gps').innerHTML = html || '<tr><td class="p-5 text-center text-slate-400 italic">Captura el perímetro</td></tr>';
+            document.getElementById('lista-gps').innerHTML = html;
         }
 
         function calcularAreaGPS() {
-            if (puntosGPS.length < 3) return document.getElementById('area-gps').innerText = "0 m²";
+            if (puntosGPS.length < 3) {
+                document.getElementById('area-gps').innerText = "0 m²";
+                return;
+            }
             const origin = puntosGPS[0];
             const coords = puntosGPS.map(p => ({
                 x: (p.lng - origin.lng) * (Math.PI / 180) * R * Math.cos(origin.lat * Math.PI / 180),
@@ -286,142 +503,328 @@
                 let j = (i + 1) % coords.length;
                 area += coords[i].x * coords[j].y - coords[j].x * coords[i].y;
             }
-            document.getElementById('area-gps').innerText = (Math.abs(area) / 2).toLocaleString(undefined, {maximumFractionDigits: 1}) + " m²";
+            const areaM2 = Math.abs(area) / 2;
+            document.getElementById('area-gps').innerText = areaM2.toLocaleString(undefined, {maximumFractionDigits: 1}) + " m²";
         }
 
         function dibujarMapaGPS() {
             const svg = document.getElementById('svg-gps');
-            if (puntosGPS.length === 0) { svg.innerHTML = '<text x="50" y="50" fill="#94a3b8" text-anchor="middle" font-size="6">Polígono vacío</text>'; return; }
+            if (puntosGPS.length === 0) { 
+                svg.innerHTML = '<text x="50" y="50" fill="#94a3b8" text-anchor="middle" font-size="6">Polígono vacío</text>'; 
+                return; 
+            }
             const origin = puntosGPS[0];
-            const coords = puntosGPS.map(p => ({ x: (p.lng - origin.lng) * (Math.PI / 180) * R * Math.cos(origin.lat * Math.PI / 180), y: (p.lat - origin.lat) * (Math.PI / 180) * R }));
+            const coords = puntosGPS.map(p => ({ 
+                x: (p.lng - origin.lng) * (Math.PI / 180) * R * Math.cos(origin.lat * Math.PI / 180), 
+                y: (p.lat - origin.lat) * (Math.PI / 180) * R 
+            }));
             const xs = coords.map(c => c.x), ys = coords.map(c => c.y);
             const w = (Math.max(...xs) - Math.min(...xs)) || 2, h = (Math.max(...ys) - Math.min(...ys)) || 2;
             const pad = Math.max(w, h) * 0.3 || 10;
             
             svg.setAttribute('viewBox', `${Math.min(...xs) - pad} ${Math.min(...ys) - pad} ${w + pad*2} ${h + pad*2}`);
             let html = '';
+            
+            // Dibujar polígono
             if (coords.length > 1) {
                 const pts = coords.map(c => `${c.x},${-c.y}`).join(' ');
-                html += `<polyline points="${pts}" fill="rgba(59, 130, 246, 0.2)" stroke="#3b82f6" stroke-width="${pad/15}" stroke-linejoin="round" />`;
-                if (coords.length > 2) html += `<line x1="${coords[coords.length-1].x}" y1="${-coords[coords.length-1].y}" x2="${coords[0].x}" y2="${-coords[0].y}" stroke="#3b82f6" stroke-width="${pad/20}" stroke-dasharray="${pad/15}" opacity="0.4" />`;
+                const fillOpacity = coords.length >= 3 ? '0.2' : '0';
+                html += `<polyline points="${pts}" fill="rgba(59, 130, 246, ${fillOpacity})" stroke="#3b82f6" stroke-width="${Math.max(0.3, pad/15)}" stroke-linejoin="round" />`;
+                // Línea de cierre punteada si no está cerrado
+                if (coords.length >= 3) {
+                    html += `<line x1="${coords[coords.length-1].x}" y1="${-coords[coords.length-1].y}" x2="${coords[0].x}" y2="${-coords[0].y}" stroke="#3b82f6" stroke-width="${Math.max(0.2, pad/20)}" stroke-dasharray="${Math.max(1, pad/15)}" opacity="0.4" />`;
+                }
             }
+            // Dibujar puntos
             coords.forEach((c, i) => {
-                const col = i === 0 ? '#10b981' : (i === coords.length-1 ? '#ef4444' : 'white');
-                html += `<circle cx="${c.x}" cy="${-c.y}" r="${pad/8}" fill="${col}" stroke="#0f172a" stroke-width="${pad/30}" />`;
+                const esInicio = i === 0, esActual = i === coords.length - 1;
+                const color = esInicio ? '#10b981' : esActual ? '#ef4444' : '#3b82f6';
+                const radio = Math.max(0.8, pad/12);
+                html += `<circle cx="${c.x}" cy="${-c.y}" r="${radio}" fill="${color}" stroke="#0f172a" stroke-width="${Math.max(0.1, pad/40)}" />`;
+                // Numerar vértices
+                html += `<text x="${c.x + radio*2}" y="${-c.y - radio}" fill="#475569" font-size="${Math.max(2, pad/8)}" font-weight="bold">${i+1}</text>`;
             });
             svg.innerHTML = html;
         }
 
-        function descargarGPS(formato) {
-            if (puntosGPS.length === 0) return showToast("Captura puntos primero");
-            let data = "", name = `GeoCAD_${new Date().toISOString().slice(0,10)}`;
+        // === FUNCIONES COMPARTIR/EXPORTAR GPS ===
+        function compartirGPS(formato) {
+            if (puntosGPS.length === 0) return showToast("⚠️ Captura al menos 3 puntos primero");
+            
+            let data = "", name = `GeoCAD_${new Date().toISOString().slice(0,10)}`, tipoMime = 'text/plain';
             
             if (formato === 'kml') {
-                data = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n  <Document>\n    <name>${name}</name>\n    <Style id="polyStyle">\n      <LineStyle><color>ff0000ff</color><width>2</width></LineStyle>\n      <PolyStyle><color>400000ff</color></PolyStyle>\n    </Style>\n    <Placemark>\n      <name>Terreno Levantado</name>\n      <styleUrl>#polyStyle</styleUrl>\n      <Polygon>\n        <tessellate>1</tessellate>\n        <outerBoundaryIs>\n          <LinearRing>\n            <coordinates>\n              ${puntosGPS.map(p => `${p.lng},${p.lat},${p.alt}`).join('\n              ')}\n              ${puntosGPS.length > 2 ? `${puntosGPS[0].lng},${puntosGPS[0].lat},${puntosGPS[0].alt}` : ''}\n            </coordinates>\n          </LinearRing>\n        </outerBoundaryIs>\n      </Polygon>\n    </Placemark>\n  </Document>\n</kml>`;
+                // Generar KML válido para Google Earth
+                const coordsBlock = puntosGPS.map(p => `${p.lng},${p.lat},${p.alt || 0}`).join('\n              ');
+                const cierre = puntosGPS.length > 2 ? `\n              ${puntosGPS[0].lng},${puntosGPS[0].lat},${puntosGPS[0].alt || 0}` : '';
+                
+                data = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>${name}</name>
+    <description>Levantamiento topográfico generado con GeoCAD Pro - ${new Date().toLocaleDateString('es-ES')}</description>
+    <Style id="polyStyle">
+      <LineStyle><color>ff0000ff</color><width>3</width></LineStyle>
+      <PolyStyle><color>400000ff</color><outline>1</outline><fill>1</fill></PolyStyle>
+    </Style>
+    <Placemark>
+      <name>Terreno Levantado</name>
+      <description>Área: ${document.getElementById('area-gps').innerText} | Vértices: ${puntosGPS.length}</description>
+      <styleUrl>#polyStyle</styleUrl>
+      <Polygon>
+        <tessellate>1</tessellate>
+        <altitudeMode>clampToGround</altitudeMode>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>
+              ${coordsBlock}${cierre}
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+  </Document>
+</kml>`;
                 name += ".kml";
+                tipoMime = 'application/vnd.google-earth.kml+xml';
             } else if (formato === 'scr') {
-                data = "PDMODE 3\nPDSIZE 0.2\n";
-                puntosGPS.forEach(p => data += `_POINT ${p.lng},${p.lat},${p.alt}\n`);
-                if (puntosGPS.length > 2) data += "_PLINE\n" + puntosGPS.map(p => `${p.lng},${p.lat},${p.alt}`).join('\n') + "\n_CLOSE\n";
+                // Generar script para AutoCAD
+                data = "; GeoCAD Pro - Script AutoCAD\n";
+                data += "; Generado: " + new Date().toLocaleString('es-ES') + "\n";
+                data += "PDMODE 3\nPDSIZE 0.2\n";
+                puntosGPS.forEach((p, i) => {
+                    data += `_POINT ${p.lng},${p.lat},${p.alt || 0} ; Punto #${i+1}\n`;
+                });
+                if (puntosGPS.length > 2) {
+                    data += "\n; Dibujar polígono\n_PLINE\n";
+                    puntosGPS.forEach(p => data += `${p.lng},${p.lat},${p.alt || 0}\n`);
+                    data += "_CLOSE\n";
+                }
                 data += "_ZOOM _E\n";
                 name += ".scr";
             }
-            triggerDescarga(data, name);
+            
+            compartirArchivo(data, name, tipoMime);
         }
 
-        // === MANUAL ===
-        let coordManual = []; let refGpsManual = null; 
+        // === MÓDULO MANUAL ===
+        let coordManual = []; 
+        let refGpsManual = null; 
 
         function guardarEstadoManual() {
-            localStorage.setItem('geoCad_manual', JSON.stringify({ l1: document.getElementById('l1').value, l2: document.getElementById('l2').value, l3: document.getElementById('l3').value, l4: document.getElementById('l4').value, d1: document.getElementById('d1').value, refGps: refGpsManual }));
+            try {
+                const data = { 
+                    l1: document.getElementById('l1').value, 
+                    l2: document.getElementById('l2').value, 
+                    l3: document.getElementById('l3').value, 
+                    l4: document.getElementById('l4').value, 
+                    d1: document.getElementById('d1').value, 
+                    refGps: refGpsManual 
+                };
+                localStorage.setItem('geoCad_manual', JSON.stringify(data)); 
+            } catch(e) { console.log('LocalStorage Manual:', e); }
         }
 
         function limpiarManual() {
-            if(confirm("¿Borrar medidas de cinta?")) {
-                document.getElementById('l1').value = ''; document.getElementById('l2').value = ''; document.getElementById('l3').value = ''; document.getElementById('l4').value = ''; document.getElementById('d1').value = ''; refGpsManual = null;
-                document.getElementById('gps-data-manual').innerText = "Sin coordenada.";
+            if(confirm("¿Borrar todas las medidas de cinta?")) {
+                ['l1','l2','l3','l4','d1'].forEach(id => document.getElementById(id).value = '');
+                refGpsManual = null;
+                document.getElementById('gps-data-manual').innerText = "Sin coordenada. AutoCAD lo dibujará en X:0, Y:0.";
+                document.getElementById('error-manual').classList.add('hidden');
+                document.getElementById('btn-compartir-manual').disabled = true;
+                document.getElementById('btn-compartir-manual').classList.add('opacity-50', 'cursor-not-allowed');
                 calcularManual();
+                showToast("🗑️ Medidas borradas");
             }
         }
 
         function calcularManual() {
             guardarEstadoManual();
-            const l1 = parseFloat(document.getElementById('l1').value), l2 = parseFloat(document.getElementById('l2').value), l3 = parseFloat(document.getElementById('l3').value), l4 = parseFloat(document.getElementById('l4').value), d1 = parseFloat(document.getElementById('d1').value);
-            const errDiv = document.getElementById('error-manual'), btnD = document.getElementById('btn-descarga-manual');
+            const l1 = parseFloat(document.getElementById('l1').value), 
+                  l2 = parseFloat(document.getElementById('l2').value), 
+                  l3 = parseFloat(document.getElementById('l3').value), 
+                  l4 = parseFloat(document.getElementById('l4').value), 
+                  d1 = parseFloat(document.getElementById('d1').value);
             
-            coordManual = []; errDiv.classList.add('hidden'); btnD.disabled = true; btnD.classList.add('opacity-50', 'cursor-not-allowed');
-            document.getElementById('area-manual').innerText = "0 m²"; document.getElementById('perim-manual').innerText = "0 m";
+            const errDiv = document.getElementById('error-manual'), 
+                  btnD = document.getElementById('btn-compartir-manual');
             
-            if (!l1 || !l2 || !l3 || !l4 || !d1) { document.getElementById('svg-manual').innerHTML = ''; return; }
-            if (l1 + l2 <= d1 || l1 + d1 <= l2 || l2 + d1 <= l1 || d1 + l3 <= l4 || d1 + l4 <= l3 || l3 + l4 <= d1) {
-                errDiv.innerText = "⚠️ Medidas incorrectas. Físicamente imposible."; errDiv.classList.remove('hidden'); document.getElementById('svg-manual').innerHTML = ''; return;
+            coordManual = []; 
+            errDiv.classList.add('hidden'); 
+            btnD.disabled = true; 
+            btnD.classList.add('opacity-50', 'cursor-not-allowed');
+            document.getElementById('area-manual').innerText = "0 m²"; 
+            document.getElementById('perim-manual').innerText = "0 m";
+            document.getElementById('svg-manual').innerHTML = '<text id="manual-placeholder" x="50" y="50" fill="#94a3b8" text-anchor="middle" font-size="6" font-weight="bold">Ingresa medidas...</text>';
+            
+            // Validar que todos los campos tengan valor
+            if (!l1 || !l2 || !l3 || !l4 || !d1) return;
+            
+            // Validar desigualdad triangular para ambos triángulos
+            const validTri1 = (l1 + l2 > d1) && (l1 + d1 > l2) && (l2 + d1 > l1);
+            const validTri2 = (d1 + l3 > l4) && (d1 + l4 > l3) && (l3 + l4 > d1);
+            
+            if (!validTri1 || !validTri2) {
+                errDiv.innerText = "⚠️ Medidas inválidas: No forman triángulos válidos. Revisa las longitudes."; 
+                errDiv.classList.remove('hidden'); 
+                return;
             }
 
+            // Calcular coordenadas usando trigonometría
             const pA = { x: 0, y: 0 }, pB = { x: l1, y: 0 };
-            const alpha = Math.acos((Math.pow(l1, 2) + Math.pow(d1, 2) - Math.pow(l2, 2)) / (2 * l1 * d1));
+            
+            // Triángulo ABC: calcular ángulo en A
+            const cosAlpha = (Math.pow(l1, 2) + Math.pow(d1, 2) - Math.pow(l2, 2)) / (2 * l1 * d1);
+            const alpha = Math.acos(Math.max(-1, Math.min(1, cosAlpha))); // Clamp para evitar errores de precisión
             const pC = { x: d1 * Math.cos(alpha), y: d1 * Math.sin(alpha) };
-            const beta = Math.acos((Math.pow(d1, 2) + Math.pow(l4, 2) - Math.pow(l3, 2)) / (2 * d1 * l4));
+            
+            // Triángulo ACD: calcular ángulo entre AC y AD
+            const cosBeta = (Math.pow(d1, 2) + Math.pow(l4, 2) - Math.pow(l3, 2)) / (2 * d1 * l4);
+            const beta = Math.acos(Math.max(-1, Math.min(1, cosBeta)));
             const pD = { x: l4 * Math.cos(alpha + beta), y: l4 * Math.sin(alpha + beta) };
 
             coordManual = [pA, pB, pC, pD];
-            const s1 = (l1 + l2 + d1) / 2, a1 = Math.sqrt(s1 * (s1 - l1) * (s1 - l2) * (s1 - d1));
-            const s2 = (d1 + l3 + l4) / 2, a2 = Math.sqrt(s2 * (s2 - d1) * (s2 - l3) * (s2 - l4));
             
-            document.getElementById('area-manual').innerText = (a1 + a2).toLocaleString(undefined, {maximumFractionDigits: 1}) + " m²";
-            document.getElementById('perim-manual').innerText = (l1 + l2 + l3 + l4).toLocaleString(undefined, {maximumFractionDigits: 1}) + " m";
+            // Calcular área con fórmula de Herón para ambos triángulos
+            const s1 = (l1 + l2 + d1) / 2;
+            const a1 = Math.sqrt(Math.max(0, s1 * (s1 - l1) * (s1 - l2) * (s1 - d1)));
+            const s2 = (d1 + l3 + l4) / 2;
+            const a2 = Math.sqrt(Math.max(0, s2 * (s2 - d1) * (s2 - l3) * (s2 - l4)));
             
-            btnD.disabled = false; btnD.classList.remove('opacity-50', 'cursor-not-allowed');
+            const areaTotal = a1 + a2;
+            const perimetro = l1 + l2 + l3 + l4;
+            
+            document.getElementById('area-manual').innerText = areaTotal.toLocaleString(undefined, {maximumFractionDigits: 1}) + " m²";
+            document.getElementById('perim-manual').innerText = perimetro.toLocaleString(undefined, {maximumFractionDigits: 1}) + " m";
+            
+            // Habilitar botón de compartir
+            btnD.disabled = false; 
+            btnD.classList.remove('opacity-50', 'cursor-not-allowed');
             dibujarMapaManual();
         }
 
         function dibujarMapaManual() {
+            if (coordManual.length !== 4) return;
             const svg = document.getElementById('svg-manual');
             const xs = coordManual.map(p => p.x), ys = coordManual.map(p => p.y);
-            const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys), pad = Math.max(w, h) * 0.25;
+            const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys);
+            const pad = Math.max(w, h) * 0.25 + 2;
+            
+            // Ajustar viewBox para mostrar todo el polígono
             svg.setAttribute('viewBox', `${Math.min(...xs) - pad} ${-Math.max(...ys) - pad} ${w + pad*2} ${h + pad*2}`);
             
+            // Dibujar polígono
             const pts = coordManual.map(p => `${p.x},${-p.y}`).join(' ');
-            let html = `<polygon points="${pts}" fill="rgba(16, 185, 129, 0.1)" stroke="#10b981" stroke-width="${pad/20}" stroke-linejoin="round" />`;
-            html += `<line x1="${coordManual[0].x}" y1="${-coordManual[0].y}" x2="${coordManual[2].x}" y2="${-coordManual[2].y}" stroke="#ef4444" stroke-width="${pad/30}" stroke-dasharray="${pad/10}" />`;
+            let html = `<polygon points="${pts}" fill="rgba(16, 185, 129, 0.15)" stroke="#10b981" stroke-width="${Math.max(0.4, pad/25)}" stroke-linejoin="round" />`;
+            
+            // Dibujar diagonal (medida de verificación)
+            html += `<line x1="${coordManual[0].x}" y1="${-coordManual[0].y}" x2="${coordManual[2].x}" y2="${-coordManual[2].y}" stroke="#ef4444" stroke-width="${Math.max(0.2, pad/35)}" stroke-dasharray="${Math.max(1, pad/12)}" opacity="0.7" />`;
+            
+            // Dibujar vértices y etiquetas
+            const labels = ['A', 'B', 'C', 'D'];
             coordManual.forEach((p, i) => {
-                html += `<circle cx="${p.x}" cy="${-p.y}" r="${pad/12}" fill="#10b981" />`;
-                html += `<text x="${p.x}" y="${-p.y - pad/5}" fill="#334155" font-size="${pad/4}" text-anchor="middle" font-weight="bold">V${i+1}</text>`;
+                const radio = Math.max(0.6, pad/15);
+                html += `<circle cx="${p.x}" cy="${-p.y}" r="${radio}" fill="#10b981" stroke="white" stroke-width="${Math.max(0.1, pad/50)}" />`;
+                html += `<text x="${p.x}" y="${-p.y - radio - 1}" fill="#1e293b" font-size="${Math.max(2.5, pad/6)}" text-anchor="middle" font-weight="bold">${labels[i]}</text>`;
             });
+            
+            // Mostrar medidas en los lados
+            const medidas = [
+                {p1: coordManual[0], p2: coordManual[1], val: document.getElementById('l1').value + 'm'},
+                {p1: coordManual[1], p2: coordManual[2], val: document.getElementById('l2').value + 'm'},
+                {p1: coordManual[2], p2: coordManual[3], val: document.getElementById('l3').value + 'm'},
+                {p1: coordManual[3], p2: coordManual[0], val: document.getElementById('l4').value + 'm'}
+            ];
+            medidas.forEach(m => {
+                const mx = (m.p1.x + m.p2.x) / 2, my = (m.p1.y + m.p2.y) / 2;
+                html += `<text x="${mx}" y="${-my + 2}" fill="#64748b" font-size="${Math.max(1.5, pad/10)}" text-anchor="middle">${m.val}</text>`;
+            });
+            
             svg.innerHTML = html;
         }
 
         function capturarRefManual() {
-            if (!actualGPS) return showToast("No hay señal GPS");
-            refGpsManual = {...actualGPS}; guardarEstadoManual();
-            document.getElementById('gps-data-manual').innerHTML = `<span class="text-emerald-600 font-bold">Anclado</span> (Error ±${refGpsManual.acc.toFixed(1)}m)<br>Lat: ${refGpsManual.lat.toFixed(5)} | Lon: ${refGpsManual.lng.toFixed(5)}`;
-            showToast("Referencia guardada");
+            if (!actualGPS) return showToast("⏳ No hay señal GPS disponible");
+            refGpsManual = {...actualGPS}; 
+            guardarEstadoManual();
+            document.getElementById('gps-data-manual').innerHTML = `<span class="text-emerald-600 font-bold">✅ Anclado</span> (±${refGpsManual.acc.toFixed(1)}m)<br>Lat: ${refGpsManual.lat.toFixed(5)} | Lon: ${refGpsManual.lng.toFixed(5)}`;
+            showToast("📍 Referencia GPS guardada");
         }
 
-        function descargarManual() {
-            if (coordManual.length === 0) return;
-            let data = "_PLINE\n"; coordManual.forEach(p => data += `${p.x.toFixed(4)},${p.y.toFixed(4)}\n`); data += "_CLOSE\n_ZOOM _E\n";
-            const cx = (coordManual[0].x + coordManual[2].x) / 2, cy = (coordManual[0].y + coordManual[2].y) / 2;
-            const th = Math.max(0.5, parseFloat(document.getElementById('l1').value) * 0.05).toFixed(2);
-            data += `_TEXT _J _MC ${cx.toFixed(4)},${cy.toFixed(4)}\n${th}\n0\nArea Exacta: ${document.getElementById('area-manual').innerText}\n`;
-            triggerDescarga(data, `TopoManual_${new Date().toISOString().slice(0,10)}.scr`);
+        // === FUNCIÓN COMPARTIR MANUAL ===
+        function compartirManual() {
+            if (coordManual.length !== 4) return showToast("⚠️ Primero completa y calcula las medidas");
+            
+            let data = "; GeoCAD Pro - Script AutoCAD (Medición Manual)\n";
+            data += "; Generado: " + new Date().toLocaleString('es-ES') + "\n";
+            data += "; Área: " + document.getElementById('area-manual').innerText + " | Perímetro: " + document.getElementById('perim-manual').innerText + "\n\n";
+            
+            data += "_PLINE\n"; 
+            coordManual.forEach((p, i) => {
+                data += `${p.x.toFixed(4)},${p.y.toFixed(4)} ; Vértice ${String.fromCharCode(65+i)}\n`;
+            }); 
+            data += "_CLOSE\n";
+            
+            // Agregar texto con información del área
+            const cx = (coordManual[0].x + coordManual[2].x) / 2, 
+                  cy = (coordManual[0].y + coordManual[2].y) / 2;
+            const th = Math.max(0.5, parseFloat(document.getElementById('l1').value || 10) * 0.05).toFixed(2);
+            data += `_TEXT _J _MC ${cx.toFixed(4)},${cy.toFixed(4)}\n${th}\n0\nAREA: ${document.getElementById('area-manual').innerText}\n`;
+            data += "_ZOOM _E\n";
+            
+            const nombreArchivo = `TopoManual_${new Date().toISOString().slice(0,10)}.scr`;
+            compartirArchivo(data, nombreArchivo, 'text/plain');
         }
 
-        function triggerDescarga(contenido, nombreArchivo) {
-            const blob = new Blob([contenido], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = nombreArchivo; a.click(); URL.revokeObjectURL(url);
-        }
-
+        // === INICIALIZACIÓN ===
         window.addEventListener('load', () => {
-            const savedGPS = localStorage.getItem('geoCad_puntosGPS');
-            if (savedGPS) { puntosGPS = JSON.parse(savedGPS); if (puntosGPS.length > 0) { renderTablaGPS(); dibujarMapaGPS(); calcularAreaGPS(); } }
-            const savedManual = localStorage.getItem('geoCad_manual');
-            if (savedManual) {
-                const data = JSON.parse(savedManual);
-                ['l1','l2','l3','l4','d1'].forEach(id => { if(data[id]) document.getElementById(id).value = data[id]; });
-                if (data.refGps) { refGpsManual = data.refGps; document.getElementById('gps-data-manual').innerHTML = `<span class="text-emerald-600 font-bold">Anclado</span><br>Lat: ${refGpsManual.lat.toFixed(5)} | Lon: ${refGpsManual.lng.toFixed(5)}`; }
-                calcularManual();
+            // Cargar datos GPS guardados
+            try {
+                const savedGPS = localStorage.getItem('geoCad_puntosGPS');
+                if (savedGPS) { 
+                    puntosGPS = JSON.parse(savedGPS); 
+                    if (puntosGPS.length > 0) { 
+                        renderTablaGPS(); 
+                        dibujarMapaGPS(); 
+                        calcularAreaGPS(); 
+                        showToast("📦 Datos GPS restaurados");
+                    } 
+                }
+            } catch(e) { console.log('Error cargando GPS:', e); }
+            
+            // Cargar datos manuales guardados
+            try {
+                const savedManual = localStorage.getItem('geoCad_manual');
+                if (savedManual) {
+                    const data = JSON.parse(savedManual);
+                    ['l1','l2','l3','l4','d1'].forEach(id => { 
+                        if(data[id]) document.getElementById(id).value = data[id]; 
+                    });
+                    if (data.refGps) { 
+                        refGpsManual = data.refGps; 
+                        document.getElementById('gps-data-manual').innerHTML = `<span class="text-emerald-600 font-bold">✅ Anclado</span><br>Lat: ${refGpsManual.lat.toFixed(5)} | Lon: ${refGpsManual.lng.toFixed(5)}`; 
+                    }
+                    if (data.l1 && data.l2 && data.l3 && data.l4 && data.d1) {
+                        calcularManual();
+                    }
+                }
+            } catch(e) { console.log('Error cargando Manual:', e); }
+            
+            // Debug info (solo desarrollo)
+            // console.log('🔐 HTTPS:', window.location.protocol === 'https:');
+            // console.log('📤 Web Share:', !!navigator.share);
+        });
+
+        // Prevenir zoom en inputs en iOS
+        document.addEventListener('touchstart', function(event) {
+            if (event.touches.length > 1) {
+                event.preventDefault();
             }
+        }, { passive: false });
+
+        // Cerrar modal con tecla ESC
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') cerrarModalCompartir();
         });
     </script>
 </body>
